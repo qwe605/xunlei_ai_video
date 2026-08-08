@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import Plyr from 'plyr'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { askPersistedVideo } from '../api/questions'
 import type { Video, VideoQa } from '../data/schema'
 import { answerVideoQuestion } from '../lib/search'
 import { clampTime, formatDuration } from '../lib/time'
@@ -83,6 +84,7 @@ export function PlayerPage({ video, startSeconds, onBack, onProgress }: PlayerPa
   const [activeTab, setActiveTab] = useState<'chapters' | 'transcript' | 'ask'>('chapters')
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<VideoQa | null | 'no-evidence'>(null)
+  const [asking, setAsking] = useState(false)
   const [transcript, setTranscript] = useState<TranscriptCue[]>([])
 
   useEffect(() => {
@@ -234,10 +236,19 @@ export function PlayerPage({ video, startSeconds, onBack, onProgress }: PlayerPa
   const ask = (event?: FormEvent, suggestedQuestion?: string) => {
     event?.preventDefault()
     const nextQuestion = (suggestedQuestion ?? question).trim()
-    if (!nextQuestion) return
+    if (!nextQuestion || asking) return
     setQuestion(nextQuestion)
     setActiveTab('ask')
-    setAnswer(answerVideoQuestion(video, nextQuestion) ?? 'no-evidence')
+    setAsking(true)
+    setAnswer(null)
+    void askPersistedVideo(video.id, nextQuestion)
+      .then((backendAnswer) => {
+        setAnswer(backendAnswer ?? answerVideoQuestion(video, nextQuestion) ?? 'no-evidence')
+      })
+      .catch(() => {
+        setAnswer(answerVideoQuestion(video, nextQuestion) ?? 'no-evidence')
+      })
+      .finally(() => setAsking(false))
   }
 
   return (
@@ -379,13 +390,23 @@ export function PlayerPage({ video, startSeconds, onBack, onProgress }: PlayerPa
                 </div>
               </div>
 
-              {!answer && (
+              {!answer && !asking && (
                 <div className="question-suggestions">
                   {recommendedQuestions.map((suggestion) => (
                     <button type="button" key={suggestion} onClick={() => ask(undefined, suggestion)}>
                       {suggestion}
                     </button>
                   ))}
+                </div>
+              )}
+
+              {asking && (
+                <div className="answer-block" role="status">
+                  <div className="answer-label">
+                    <Sparkles size={16} aria-hidden="true" />
+                    正在检索当前视频证据
+                  </div>
+                  <p className="answer-text">正在从字幕和章节中查找依据，找到证据后再生成回答。</p>
                 </div>
               )}
 
@@ -445,7 +466,12 @@ export function PlayerPage({ video, startSeconds, onBack, onProgress }: PlayerPa
                   placeholder="例如：后面有没有讲登录失效？"
                   maxLength={160}
                 />
-                <button type="submit" aria-label="发送问题" title="发送问题" disabled={!question.trim()}>
+                <button
+                  type="submit"
+                  aria-label="发送问题"
+                  title="发送问题"
+                  disabled={!question.trim() || asking}
+                >
                   <Send size={18} />
                 </button>
               </form>

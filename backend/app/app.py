@@ -8,6 +8,7 @@ from app.controllers import api_router
 from app.database.session import init_database
 from app.services.analysis_jobs import AnalysisService
 from app.services.library import LibraryService
+from app.services.questions import QuestionService
 from app.services.search import SearchService
 
 
@@ -19,6 +20,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     application.state.analysis_service = service
     application.state.library_service = LibraryService()
     application.state.search_service = SearchService()
+    application.state.question_service = QuestionService()
     try:
         yield
     finally:

@@ -9,8 +9,10 @@ from app.integrations.minimax import (
     OrganizedVideo,
     apply_organization_corrections,
     extract_json,
+    request_video_answer,
     request_organization,
 )
+from app.schemas import SearchCitation
 
 
 class MinimaxSummaryTests(unittest.TestCase):
@@ -27,6 +29,40 @@ class MinimaxSummaryTests(unittest.TestCase):
         )
         value = extract_json(content)
         self.assertEqual(value["chapters"][0]["title"], "产品配置与模型切换")
+
+    def test_video_answer_requires_citation_from_candidates(self) -> None:
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": '{"answer":"视频提到 Cookie 过期会导致登录失效。","citation_ids":["c1","fake"]}'
+                    }
+                }
+            ]
+        }
+
+        with (
+            patch("app.integrations.minimax.MINIMAX_API_KEY", "test-key"),
+            patch("app.integrations.minimax.httpx.post", return_value=response),
+        ):
+            answer = request_video_answer(
+                "有没有讲登录失效？",
+                [
+                    SearchCitation(
+                        id="c1",
+                        video_id="video",
+                        start_seconds=12,
+                        end_seconds=16,
+                        text="Cookie 过期会导致登录失效",
+                        source_type="subtitle",
+                        confidence=0.9,
+                    )
+                ],
+            )
+
+        self.assertEqual(answer.citation_ids, ["c1"])
 
     def test_rejects_non_json_output(self) -> None:
         with self.assertRaisesRegex(Exception, "JSON"):

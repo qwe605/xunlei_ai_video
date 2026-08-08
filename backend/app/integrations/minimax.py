@@ -6,7 +6,7 @@ import httpx
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from app.config import MINIMAX_API_KEY, MINIMAX_BASE_URL, MINIMAX_MODEL
-from app.schemas import AnalysisResult, ChapterResult
+from app.schemas import AnalysisResult, ChapterResult, SearchCitation
 from app.services.content_analysis import TranscriptSegment, build_vtt
 from app.services.text_normalization import simplify_data, to_simplified_chinese
 
@@ -53,6 +53,11 @@ class MinimaxSummaryError(Exception):
     pass
 
 
+class VideoAnswer(BaseModel):
+    answer: str = Field(min_length=1, max_length=220)
+    citation_ids: list[str] = Field(min_length=1, max_length=3)
+
+
 def normalize_for_comparison(value: str) -> str:
     """比较校订前后文字时忽略空白和标点，只衡量实际内容变化。"""
     return re.sub(r"[^A-Za-z0-9\u4e00-\u9fff]+", "", value).lower()
@@ -95,6 +100,69 @@ def extract_json(content: str) -> dict:
     if not isinstance(value, dict):
         raise MinimaxSummaryError("MiniMax 返回结果不是对象")
     return value
+
+
+def request_video_answer(question: str, citations: list[SearchCitation]) -> VideoAnswer:
+    """基于已检索证据生成问视频答案；citation 必须来自调用方传入的候选证据。"""
+    if not MINIMAX_API_KEY:
+        raise MinimaxSummaryError("MiniMax API Key 未配置")
+    if not citations:
+        raise MinimaxSummaryError("没有可用于问答的证据")
+
+    allowed_ids = {citation.id for citation in citations}
+    evidence_text = "\n".join(
+        (
+            f"[id={citation.id} {timestamp(citation.start_seconds)}-"
+            f"{timestamp(citation.end_seconds)}] {citation.text}"
+        )
+        for citation in citations
+    )
+    system_prompt = """
+你是视频问答助手。只能根据用户提供的当前视频证据回答，不得使用常识补充。
+如果证据不足以回答，请返回 {"answer":"","citation_ids":[]}。
+输出必须是单个 JSON 对象，不要 Markdown，不要解释，不要思考过程。
+answer 使用简体中文，控制在 120 字以内；citation_ids 只能填写证据列表中存在的 id。
+JSON 格式：{"answer":"简短回答","citation_ids":["证据 id"]}
+""".strip()
+    user_prompt = f"问题：{question}\n\n当前视频证据：\n{evidence_text[:20_000]}"
+    try:
+        response = httpx.post(
+            f"{MINIMAX_BASE_URL}/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {MINIMAX_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": MINIMAX_MODEL,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": 0.1,
+                "max_completion_tokens": 1024,
+                "thinking": {"type": "disabled"},
+            },
+            timeout=60,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except (httpx.HTTPError, ValueError) as error:
+        raise MinimaxSummaryError("MiniMax 问答请求失败") from error
+
+    try:
+        content = payload["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as error:
+        raise MinimaxSummaryError("MiniMax 问答响应缺少正文") from error
+
+    try:
+        parsed = simplify_data(extract_json(str(content)))
+        answer = VideoAnswer.model_validate(parsed)
+    except ValidationError as error:
+        raise MinimaxSummaryError("MiniMax 问答结构校验失败") from error
+    valid_ids = [citation_id for citation_id in answer.citation_ids if citation_id in allowed_ids]
+    if not answer.answer.strip() or not valid_ids:
+        raise MinimaxSummaryError("MiniMax 没有返回可核验证据")
+    return answer.model_copy(update={"answer": to_simplified_chinese(answer.answer), "citation_ids": valid_ids[:3]})
 
 
 def request_organization(

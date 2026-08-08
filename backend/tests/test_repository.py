@@ -6,6 +6,9 @@ from sqlalchemy.orm import sessionmaker
 from app.database.base import Base
 from app.database.repositories import AnalysisJobRepository, SearchRepository, VideoRepository
 from app.schemas import AnalysisJob, AnalysisResult, ChapterResult, JobStatus, SearchRequest
+from app.schemas import VideoQuestionRequest
+from app.integrations.minimax import MinimaxSummaryError
+from app.services.questions import QuestionService
 from app.services.search import SearchService
 
 
@@ -252,6 +255,90 @@ class SearchServiceTests(unittest.TestCase):
         self.assertEqual(response.results[0].video_id, "video-rag-search")
         self.assertGreaterEqual(len(response.results[0].citations), 1)
         self.assertEqual(response.results[0].citations[0].source_type, "chapter")
+
+
+class QuestionServiceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite+pysqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
+        self.patch_scope = unittest.mock.patch("app.services.questions.session_scope", self._session_scope)
+        self.patch_answer = unittest.mock.patch(
+            "app.services.questions.request_video_answer",
+            side_effect=MinimaxSummaryError("测试环境不调用模型"),
+        )
+        self.patch_scope.start()
+        self.patch_answer.start()
+
+    def tearDown(self) -> None:
+        self.patch_answer.stop()
+        self.patch_scope.stop()
+        self.engine.dispose()
+
+    def _session_scope(self):
+        return self.session_factory.begin()
+
+    def _seed_video(self) -> None:
+        with self.session_factory.begin() as session:
+            repository = VideoRepository(session)
+            repository.create_placeholder(
+                video_id="video-question",
+                owner_id="demo-local",
+                title="登录问题复盘",
+                original_filename="login.mp4",
+                duration_seconds=100,
+            )
+            repository.apply_analysis_result(
+                video_id="video-question",
+                owner_id="demo-local",
+                result=AnalysisResult(
+                    language="中文（简体）",
+                    confidence=0.93,
+                    short_description="讲解 Cookie 登录失效排查。",
+                    summary="视频说明 Cookie 过期会导致登录失效，并建议重新获取会话。",
+                    tags=["登录", "Cookie"],
+                    subtitles_vtt=(
+                        "WEBVTT\n\n"
+                        "1\n00:00:20.000 --> 00:00:24.000\nCookie 过期会导致登录失效\n"
+                    ),
+                    asr_model="faster-whisper:large-v3",
+                    chapters=[
+                        ChapterResult(
+                            id="chapter-login",
+                            title="登录失效原因",
+                            start_seconds=18,
+                            end_seconds=40,
+                            summary="说明 Cookie 过期会导致登录失败。",
+                            source="subtitle",
+                            confidence=0.91,
+                            spoiler_level="none",
+                        )
+                    ],
+                ),
+            )
+
+    def test_question_service_answers_with_retrieved_citation_fallback(self) -> None:
+        self._seed_video()
+
+        response = QuestionService().answer_video_question(
+            video_id="video-question",
+            payload=VideoQuestionRequest(question="有没有讲 Cookie 登录失效？"),
+        )
+
+        self.assertEqual(response.status, "answered")
+        self.assertIn("Cookie", response.answer)
+        self.assertGreaterEqual(len(response.citations), 1)
+
+    def test_question_service_refuses_without_evidence(self) -> None:
+        self._seed_video()
+
+        response = QuestionService().answer_video_question(
+            video_id="video-question",
+            payload=VideoQuestionRequest(question="有没有推荐北京餐厅？"),
+        )
+
+        self.assertEqual(response.status, "no_evidence")
+        self.assertEqual(response.citations, [])
 
 
 if __name__ == "__main__":

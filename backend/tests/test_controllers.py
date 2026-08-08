@@ -19,6 +19,8 @@ from app.schemas import (
     VideoDeleteResponse,
     VideoDetail,
     VideoListItem,
+    VideoQuestionRequest,
+    VideoQuestionResponse,
 )
 
 
@@ -168,6 +170,26 @@ class FakeSearchService:
         )
 
 
+class FakeQuestionService:
+    def __init__(self) -> None:
+        self.payload: VideoQuestionRequest | None = None
+
+    def answer_video_question(
+        self,
+        *,
+        video_id: str,
+        payload: VideoQuestionRequest,
+    ) -> VideoQuestionResponse:
+        if video_id != "video-api":
+            raise LookupError("视频不存在或无权访问")
+        self.payload = payload
+        return VideoQuestionResponse(
+            video_id=video_id,
+            question=payload.question,
+            status="no_evidence",
+        )
+
+
 class ControllerTests(unittest.TestCase):
     def setUp(self) -> None:
         application = FastAPI()
@@ -175,9 +197,11 @@ class ControllerTests(unittest.TestCase):
         self.service = FakeAnalysisService()
         self.library_service = FakeLibraryService()
         self.search_service = FakeSearchService()
+        self.question_service = FakeQuestionService()
         application.state.analysis_service = self.service
         application.state.library_service = self.library_service
         application.state.search_service = self.search_service
+        application.state.question_service = self.question_service
         self.client = TestClient(application)
 
     def tearDown(self) -> None:
@@ -285,6 +309,16 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["results"][0]["videoId"], "video-api")
         self.assertEqual(self.search_service.payload.limit, 5)  # type: ignore[union-attr]
+
+    def test_video_question_endpoint_uses_current_video_scope(self) -> None:
+        response = self.client.post(
+            "/api/v1/videos/video-api/questions",
+            json={"question": "有没有讲登录失效？", "ownerId": "demo-local"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "no_evidence")
+        self.assertEqual(self.question_service.payload.question, "有没有讲登录失效？")  # type: ignore[union-attr]
 
 
 if __name__ == "__main__":

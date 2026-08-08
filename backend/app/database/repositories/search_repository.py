@@ -31,3 +31,16 @@ class SearchRepository:
             .order_by(VideoRecord.created_at.desc())
         )
         return [SearchCorpusVideo(record=record) for record in self._session.scalars(statement)]
+
+    def get_searchable_video(self, video_id: str, owner_id: str) -> SearchCorpusVideo | None:
+        statement = (
+            select(VideoRecord)
+            .where(VideoRecord.id == video_id, VideoRecord.owner_id == owner_id)
+            .options(
+                selectinload(VideoRecord.tags),
+                selectinload(VideoRecord.chapters),
+                selectinload(VideoRecord.transcript_segments),
+            )
+        )
+        record = self._session.scalar(statement)
+        return SearchCorpusVideo(record=record) if record else None

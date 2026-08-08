@@ -195,3 +195,18 @@ class SearchResponse(ApiModel):
     mode: str
     total: int = Field(ge=0)
     results: list[SearchResultItem] = Field(default_factory=list)
+
+
+class VideoQuestionRequest(ApiModel):
+    question: str = Field(min_length=1, max_length=160)
+    owner_id: str = Field(default="demo-local", min_length=1, max_length=120)
+    limit: int = Field(default=5, ge=1, le=8)
+
+
+class VideoQuestionResponse(ApiModel):
+    video_id: str
+    question: str
+    status: str = Field(pattern="^(answered|no_evidence)$")
+    answer: str | None = Field(default=None, max_length=260)
+    confidence: float = Field(default=0, ge=0, le=1)
+    citations: list[SearchCitation] = Field(default_factory=list, max_length=3)
