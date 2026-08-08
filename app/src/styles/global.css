@@ -1283,8 +1283,7 @@ p {
   font-size: 26px;
 }
 
-.auth-intro p,
-.auth-security-note {
+.auth-intro p {
   margin-bottom: 0;
   color: var(--text-secondary);
   font-size: 13px;
@@ -1354,12 +1353,6 @@ p {
   color: var(--text-tertiary);
   font-size: 10px;
   line-height: 1.6;
-  text-align: center;
-}
-
-.auth-security-note {
-  width: min(620px, 100%);
-  margin: 0 auto;
   text-align: center;
 }
 

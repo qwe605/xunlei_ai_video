@@ -276,9 +276,6 @@ export function App() {
           onSessionChange={handleSessionChange}
           variant="page"
         />
-        <p className="auth-security-note">
-          当前 Demo 使用浏览器本地会话保护页面入口；公网部署前仍需接入服务端鉴权、用户数据隔离和上传配额。
-        </p>
       </main>
     )
   }

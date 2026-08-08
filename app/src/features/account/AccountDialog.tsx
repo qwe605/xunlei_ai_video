@@ -249,9 +249,6 @@ export function AccountDialog({
                 {mode === 'register' ? <UserPlus size={16} /> : <LogIn size={16} />}
                 {submitting ? '处理中' : mode === 'register' ? '创建并登录' : '登录'}
               </button>
-              <p className="local-auth-note">
-                Demo 账号仅保存在当前浏览器；密码使用 PBKDF2-SHA256 派生后存储，不会发送到服务器。
-              </p>
             </form>
           </>
         )}
