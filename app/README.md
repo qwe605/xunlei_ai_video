@@ -13,6 +13,8 @@
 - 校验 BTIH 磁力链接并调用系统迅雷客户端；云盘自动转存等待官方开放接口。
 - “我的片库”支持本地注册、登录、退出，密码经 PBKDF2-SHA256 派生后保存；在公网 HTTP IP
   无法使用 Web Crypto 时，会自动切换到同算法的软件实现，既有账号摘要保持兼容。
+- 本地视频 ID 优先使用浏览器原生 UUID；公网 HTTP IP 不提供 `crypto.randomUUID` 时，使用
+  `crypto.getRandomValues` 生成兼容的 UUID v4，导入流程不会因安全上下文差异中断。
 - 本地导入后自动进入 AI 整理队列，展示阶段、进度、阻塞原因和重试操作。
 - 导入时可选择“快速”或“精准”：快速使用 Paraformer-zh，精准真实调用 faster-whisper
   large-v3；队列会显示选择，不会静默降级。

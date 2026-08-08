@@ -13,6 +13,7 @@ import {
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import { videoSchema, type Video } from '../../data/schema'
 import { formatDuration } from '../../lib/time'
+import { createUuid } from '../../lib/uuid'
 import { openMagnetInXunlei } from '../../api/system'
 import { readAnalysisCapabilities, type AnalysisMode } from '../../api/analysis'
 
@@ -180,7 +181,7 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
     }
     const title = media.file.name.replace(/\.[^.]+$/, '') || media.file.name
     const imported = videoSchema.parse({
-      id: `local-${crypto.randomUUID()}`,
+      id: `local-${createUuid()}`,
       title,
       originalFilename: media.file.name,
       mediaType: 'other',
