@@ -40,19 +40,20 @@ class LibraryService:
                 duration_seconds=duration_seconds,
             )
 
-    def get_source_asset_path(
+    def get_asset_path(
         self,
         *,
         video_id: str,
+        asset_type: str,
         owner_id: str = "demo-local",
     ) -> tuple[Path, VideoAssetRead] | None:
         with session_scope() as session:
-            asset = VideoRepository(session).get_source_asset(video_id, owner_id)
+            asset = VideoRepository(session).get_asset(video_id, owner_id, asset_type)
         if asset is None:
             return None
         path = self._resolve_media_path(asset.storage_path)
         if not path.exists() or not path.is_file():
-            raise FileNotFoundError("视频源文件不存在，请重新导入")
+            raise FileNotFoundError("视频资产不存在，请重新导入")
         return path, asset
 
     def get_active_subtitle(

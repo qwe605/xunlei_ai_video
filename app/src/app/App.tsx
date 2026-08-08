@@ -35,6 +35,7 @@ export function App() {
   )
   const localObjectUrls = useRef<string[]>([])
   const localFiles = useRef<Map<string, File>>(new Map())
+  const localPosters = useRef<Map<string, File>>(new Map())
   const localAnalysisModes = useRef<Map<string, AnalysisMode>>(new Map())
   const analysisTimers = useRef<number[]>([])
   const activeAnalysisId = useRef<string | null>(null)
@@ -150,6 +151,7 @@ export function App() {
               title: video.title,
               resolution: video.resolution,
               codec: video.codec,
+              poster: localPosters.current.get(video.id),
             },
           )
           while (remoteJob.status === 'queued' || remoteJob.status === 'processing') {
@@ -371,9 +373,10 @@ export function App() {
       {importOpen && (
         <ImportVideoDialog
           onClose={() => setImportOpen(false)}
-          onImport={(video, file, analysisMode) => {
+          onImport={(video, file, analysisMode, posterFile) => {
             localObjectUrls.current.push(video.videoUrl)
             localFiles.current.set(video.id, file)
+            localPosters.current.set(video.id, posterFile)
             localAnalysisModes.current.set(video.id, analysisMode)
             setVideos((current) => [video, ...current])
             setAnalysisJobs((current) => [createQueuedJob(video, analysisMode), ...current])

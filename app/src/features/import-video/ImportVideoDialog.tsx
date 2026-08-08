@@ -18,7 +18,7 @@ import { readAnalysisCapabilities, type AnalysisMode } from '../../api/analysis'
 
 interface ImportVideoDialogProps {
   onClose: () => void
-  onImport: (video: Video, file: File, analysisMode: AnalysisMode) => void
+  onImport: (video: Video, file: File, analysisMode: AnalysisMode, posterFile: File) => void
 }
 
 interface LocalMedia {
@@ -28,6 +28,7 @@ interface LocalMedia {
   width: number
   height: number
   posterUrl: string
+  posterFile: File
   mimeType: 'video/mp4' | 'video/webm'
 }
 
@@ -81,13 +82,19 @@ async function inspectLocalVideo(file: File): Promise<LocalMedia> {
     const height = element.videoHeight * scale
     context.drawImage(element, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
 
+    const posterUrl = canvas.toDataURL('image/jpeg', 0.84)
+    const posterBlob = await fetch(posterUrl).then((response) => response.blob())
+
     return {
       file,
       objectUrl,
       durationSeconds: element.duration,
       width: element.videoWidth,
       height: element.videoHeight,
-      posterUrl: canvas.toDataURL('image/jpeg', 0.84),
+      posterUrl,
+      posterFile: new File([posterBlob], `${file.name.replace(/\.[^.]+$/, '') || 'poster'}.jpg`, {
+        type: 'image/jpeg',
+      }),
       mimeType,
     }
   } catch (error) {
@@ -191,7 +198,7 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
     })
 
     committedUrl.current = media.objectUrl
-    onImport(imported, media.file, analysisMode)
+    onImport(imported, media.file, analysisMode, media.posterFile)
   }
 
   const validMagnet =

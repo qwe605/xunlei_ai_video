@@ -55,13 +55,39 @@ def get_video_media(
     owner_id: str = "demo-local",
 ) -> FileResponse:
     try:
-        resolved = service.get_source_asset_path(video_id=video_id, owner_id=owner_id)
+        resolved = service.get_asset_path(
+            video_id=video_id,
+            asset_type="source",
+            owner_id=owner_id,
+        )
     except PermissionError as error:
         raise HTTPException(status_code=403, detail="无权访问该视频资产") from error
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     if resolved is None:
         raise HTTPException(status_code=404, detail="视频不存在或无权访问")
+    path, asset = resolved
+    return FileResponse(path, media_type=asset.mime_type, filename=path.name)
+
+
+@router.get("/{video_id}/assets/poster")
+def get_video_poster(
+    video_id: str,
+    service: Annotated[LibraryService, Depends(get_library_service)],
+    owner_id: str = "demo-local",
+) -> FileResponse:
+    try:
+        resolved = service.get_asset_path(
+            video_id=video_id,
+            asset_type="poster",
+            owner_id=owner_id,
+        )
+    except PermissionError as error:
+        raise HTTPException(status_code=403, detail="无权访问该视频资产") from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    if resolved is None:
+        raise HTTPException(status_code=404, detail="封面不存在或尚未生成")
     path, asset = resolved
     return FileResponse(path, media_type=asset.mime_type, filename=path.name)
 

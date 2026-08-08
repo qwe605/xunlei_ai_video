@@ -137,6 +137,7 @@ class VideoListItem(ApiModel):
     import_source: str
     spoiler_protected: bool
     organize_hint: str | None = None
+    has_poster: bool = False
     tags: list[str] = Field(default_factory=list)
     progress: UserProgressRead | None = None
 

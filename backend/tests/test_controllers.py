@@ -50,7 +50,9 @@ class FakeLibraryService:
     def __init__(self) -> None:
         self._tempdir = TemporaryDirectory()
         self.media_path = Path(self._tempdir.name) / "video-api.mp4"
+        self.poster_path = Path(self._tempdir.name) / "poster.jpg"
         self.media_path.write_bytes(b"fake-media")
+        self.poster_path.write_bytes(b"fake-poster")
 
     def close(self) -> None:
         self._tempdir.cleanup()
@@ -77,6 +79,7 @@ class FakeLibraryService:
                 import_source="local",
                 spoiler_protected=False,
                 organize_hint="AI 已整理",
+                has_poster=True,
                 tags=["测试"],
                 progress=None,
             )
@@ -95,9 +98,20 @@ class FakeLibraryService:
             progress=UserProgressRead(last_position_seconds=42, completed_percent=0.35),
         )
 
-    def get_source_asset_path(self, **arguments: object) -> tuple[Path, VideoAssetRead] | None:
+    def get_asset_path(self, **arguments: object) -> tuple[Path, VideoAssetRead] | None:
         if arguments["video_id"] != "video-api":
             return None
+        if arguments["asset_type"] == "poster":
+            return (
+                self.poster_path,
+                VideoAssetRead(
+                    id="poster-api",
+                    asset_type="poster",
+                    storage_path="video-api/poster.jpg",
+                    mime_type="image/jpeg",
+                    size_bytes=self.poster_path.stat().st_size,
+                ),
+            )
         return (
             self.media_path,
             VideoAssetRead(
@@ -216,6 +230,10 @@ class ControllerTests(unittest.TestCase):
         media = self.client.get("/api/v1/videos/video-api/media")
         self.assertEqual(media.status_code, 200)
         self.assertEqual(media.headers["content-type"], "video/mp4")
+
+        poster = self.client.get("/api/v1/videos/video-api/assets/poster")
+        self.assertEqual(poster.status_code, 200)
+        self.assertEqual(poster.headers["content-type"], "image/jpeg")
 
         subtitle = self.client.get("/api/v1/videos/video-api/subtitles/active")
         self.assertEqual(subtitle.status_code, 200)

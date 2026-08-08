@@ -30,6 +30,8 @@ from app.services.subtitle_review import select_suspicious_segments
 MODEL_NAME = f"{ASR_ENGINE}:{ASR_MODEL}"
 MODEL_DEVICE = ASR_DEVICE
 ALLOWED_MEDIA = {"video/mp4": ".mp4", "video/webm": ".webm"}
+ALLOWED_POSTERS = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+MAX_POSTER_BYTES = 2 * 1024 * 1024
 logger = logging.getLogger(__name__)
 
 
@@ -97,6 +99,7 @@ class AnalysisService:
         self,
         *,
         video: UploadFile,
+        poster: UploadFile | None = None,
         video_id: str,
         duration_seconds: float,
         analysis_mode: str = "fast",
@@ -119,6 +122,9 @@ class AnalysisService:
         media_dir = self._settings.media_root / video_id
         media_dir.mkdir(parents=True, exist_ok=True)
         path = media_dir / f"source{suffix}"
+        poster_path: Path | None = None
+        poster_total = 0
+        poster_mime_type: str | None = None
         checksum = hashlib.sha256()
         total = 0
         try:
@@ -138,6 +144,27 @@ class AnalysisService:
         if total == 0:
             path.unlink(missing_ok=True)
             raise UploadValidationError(400, "视频文件为空")
+
+        if poster is not None:
+            poster_suffix = ALLOWED_POSTERS.get(poster.content_type or "")
+            if not poster_suffix:
+                path.unlink(missing_ok=True)
+                raise UploadValidationError(415, "封面仅支持 JPG、PNG 或 WebP")
+            poster_path = media_dir / f"poster{poster_suffix}"
+            try:
+                with poster_path.open("wb") as handle:
+                    while chunk := await poster.read(256 * 1024):
+                        poster_total += len(chunk)
+                        if poster_total > MAX_POSTER_BYTES:
+                            raise UploadValidationError(413, "封面图片超过 2 MB")
+                        handle.write(chunk)
+            except Exception:
+                poster_path.unlink(missing_ok=True)
+                path.unlink(missing_ok=True)
+                raise
+            finally:
+                await poster.close()
+            poster_mime_type = poster.content_type or "image/jpeg"
         filename = video.filename or f"{video_id}{suffix}"
         with session_scope() as session:
             VideoRepository(session).create_placeholder(
@@ -154,6 +181,13 @@ class AnalysisService:
                 width=width,
                 height=height,
                 checksum=checksum.hexdigest(),
+                poster_path=(
+                    poster_path.relative_to(self._settings.media_root).as_posix()
+                    if poster_path
+                    else None
+                ),
+                poster_mime_type=poster_mime_type,
+                poster_size_bytes=poster_total,
             )
         return self.create(video_id, path, duration_seconds, analysis_mode)
 

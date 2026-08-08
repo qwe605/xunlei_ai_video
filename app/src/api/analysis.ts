@@ -64,6 +64,7 @@ export async function createLocalAnalysis(
     codec?: string
     width?: number
     height?: number
+    poster?: File
   },
 ): Promise<LocalAnalysisJob> {
   const body = new FormData()
@@ -71,6 +72,7 @@ export async function createLocalAnalysis(
   body.set('duration_seconds', String(durationSeconds))
   body.set('video', file)
   body.set('analysis_mode', analysisMode)
+  if (metadata?.poster) body.set('poster', metadata.poster)
   if (metadata?.title) body.set('title', metadata.title)
   if (metadata?.resolution) body.set('resolution', metadata.resolution)
   if (metadata?.codec) body.set('codec', metadata.codec)

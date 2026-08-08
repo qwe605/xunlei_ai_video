@@ -38,6 +38,7 @@ const videoDetailSchema = z.object({
   importSource: z.enum(['demo-public', 'local']).catch('local'),
   spoilerProtected: z.boolean(),
   organizeHint: z.string().nullable().optional(),
+  hasPoster: z.boolean().default(false),
   tags: z.array(z.string().min(1)).default([]),
   progress: userProgressSchema.nullable().optional(),
   chapters: z.array(chapterSchema).default([]),
@@ -48,6 +49,8 @@ const videoListSchema = z.array(videoDetailSchema)
 type PersistedVideoDetail = z.infer<typeof videoDetailSchema>
 
 const mediaUrl = (videoId: string) => `/api/v1/videos/${encodeURIComponent(videoId)}/media`
+const posterUrl = (videoId: string) =>
+  `/api/v1/videos/${encodeURIComponent(videoId)}/assets/poster`
 const subtitleUrl = (videoId: string) =>
   `/api/v1/videos/${encodeURIComponent(videoId)}/subtitles/active`
 
@@ -71,8 +74,8 @@ export function toClientVideo(video: PersistedVideoDetail): Video {
     summary: video.summary,
     tags: video.tags.length > 0 ? video.tags : ['本地导入'],
     thumbnailCell: 0,
-    thumbnailUrl: fallbackPoster,
-    posterUrl: fallbackPoster,
+    thumbnailUrl: video.hasPoster ? posterUrl(video.id) : fallbackPoster,
+    posterUrl: video.hasPoster ? posterUrl(video.id) : fallbackPoster,
     videoUrl: mediaUrl(video.id),
     videoMimeType: video.originalFilename.toLowerCase().endsWith('.webm') ? 'video/webm' : 'video/mp4',
     subtitlesUrl: video.subtitleOrigin === 'processing' ? undefined : subtitleUrl(video.id),

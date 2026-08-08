@@ -14,6 +14,7 @@ router = APIRouter(prefix="/analyses", tags=["视频分析"])
 async def create_analysis(
     service: Annotated[AnalysisService, Depends(get_analysis_service)],
     video: UploadFile = File(),
+    poster: UploadFile | None = File(default=None),
     video_id: str = Form(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._-]+$"),
     duration_seconds: float = Form(gt=0, le=86_400),
     analysis_mode: AnalysisMode = Form(default=AnalysisMode.fast),
@@ -27,6 +28,7 @@ async def create_analysis(
     try:
         return await service.create_from_upload(
             video=video,
+            poster=poster,
             video_id=video_id,
             duration_seconds=duration_seconds,
             analysis_mode=analysis_mode.value,

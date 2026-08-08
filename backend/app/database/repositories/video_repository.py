@@ -84,6 +84,7 @@ class VideoRepository:
             select(VideoRecord)
             .where(VideoRecord.owner_id == owner_id)
             .options(
+                selectinload(VideoRecord.assets),
                 selectinload(VideoRecord.tags),
                 selectinload(VideoRecord.progress_entries),
             )
@@ -114,6 +115,9 @@ class VideoRepository:
         width: int | None = None,
         height: int | None = None,
         checksum: str | None = None,
+        poster_path: str | None = None,
+        poster_mime_type: str | None = None,
+        poster_size_bytes: int = 0,
     ) -> VideoDetail:
         existing = self._load_video(video_id, owner_id)
         if existing is not None:
@@ -156,14 +160,28 @@ class VideoRepository:
                     checksum=checksum,
                 )
             )
+        if poster_path and poster_mime_type:
+            record.assets.append(
+                VideoAssetRecord(
+                    id=_new_id(),
+                    video_id=video_id,
+                    asset_type="poster",
+                    storage_path=_relative_storage_path(Path(poster_path)),
+                    mime_type=poster_mime_type,
+                    size_bytes=poster_size_bytes,
+                    width=width,
+                    height=height,
+                    checksum=None,
+                )
+            )
         self._session.flush()
         return self._to_detail(record, owner_id)
 
-    def get_source_asset(self, video_id: str, owner_id: str) -> VideoAssetRead | None:
+    def get_asset(self, video_id: str, owner_id: str, asset_type: str) -> VideoAssetRead | None:
         record = self._load_video(video_id, owner_id)
         if record is None:
             return None
-        asset = next((item for item in record.assets if item.asset_type == "source"), None)
+        asset = next((item for item in record.assets if item.asset_type == asset_type), None)
         return VideoAssetRead.model_validate(asset) if asset else None
 
     def get_active_subtitle(self, video_id: str, owner_id: str) -> SubtitleRecord | None:
@@ -328,6 +346,7 @@ class VideoRepository:
             import_source=record.import_source,
             spoiler_protected=record.spoiler_protected,
             organize_hint=record.organize_hint,
+            has_poster=any(asset.asset_type == "poster" for asset in record.assets),
             tags=[tag.name for tag in record.tags],
             progress=cls._progress(record, owner_id),
         )
