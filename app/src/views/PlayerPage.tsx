@@ -20,6 +20,7 @@ interface PlayerPageProps {
   video: Video
   startSeconds: number
   onBack: () => void
+  onProgress: (positionSeconds: number) => void
 }
 
 interface TranscriptCue {
@@ -73,7 +74,7 @@ const parseVtt = (content: string): TranscriptCue[] =>
       ]
     })
 
-export function PlayerPage({ video, startSeconds, onBack }: PlayerPageProps) {
+export function PlayerPage({ video, startSeconds, onBack, onProgress }: PlayerPageProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerRef = useRef<Plyr | null>(null)
   const [currentTime, setCurrentTime] = useState(startSeconds)
@@ -165,6 +166,27 @@ export function PlayerPage({ video, startSeconds, onBack }: PlayerPageProps) {
       playerRef.current = null
     }
   }, [startSeconds, video.durationSeconds, video.id])
+
+  useEffect(() => {
+    const element = videoRef.current
+    if (!element) return
+    let lastSaved = Math.floor(startSeconds)
+    const persistProgress = () => {
+      const next = Math.floor(element.currentTime)
+      if (!Number.isFinite(next) || Math.abs(next - lastSaved) < 5) return
+      lastSaved = next
+      onProgress(next)
+    }
+    element.addEventListener('timeupdate', persistProgress)
+    element.addEventListener('pause', persistProgress)
+    element.addEventListener('ended', persistProgress)
+    return () => {
+      persistProgress()
+      element.removeEventListener('timeupdate', persistProgress)
+      element.removeEventListener('pause', persistProgress)
+      element.removeEventListener('ended', persistProgress)
+    }
+  }, [onProgress, startSeconds, video.id])
 
   const currentChapter = useMemo(
     () =>

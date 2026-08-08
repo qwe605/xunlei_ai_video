@@ -10,7 +10,7 @@ def to_camel(value: str) -> str:
 
 
 class ApiModel(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, from_attributes=True)
 
 
 class JobStatus(StrEnum):
@@ -75,3 +75,85 @@ class MagnetOpenRequest(ApiModel):
 class MagnetOpenResponse(ApiModel):
     status: str
     detail: str
+
+
+class VideoAssetRead(ApiModel):
+    id: str
+    asset_type: str
+    storage_path: str
+    mime_type: str
+    size_bytes: int = Field(ge=0)
+    width: int | None = Field(default=None, ge=0)
+    height: int | None = Field(default=None, ge=0)
+    checksum: str | None = None
+
+
+class SubtitleRead(ApiModel):
+    id: str
+    origin: str
+    language: str
+    asr_model: str | None = None
+    vtt_text: str = Field(min_length=1)
+    confidence: float = Field(ge=0, le=1)
+    is_active: bool
+
+
+class VideoTagRead(ApiModel):
+    id: str
+    name: str = Field(min_length=1, max_length=40)
+
+
+class UserProgressRead(ApiModel):
+    last_position_seconds: float = Field(ge=0)
+    completed_percent: float = Field(ge=0, le=1)
+
+
+class TranscriptSegmentRead(ApiModel):
+    id: str
+    start_seconds: float = Field(ge=0)
+    end_seconds: float = Field(gt=0)
+    text: str = Field(min_length=1)
+    normalized_text: str = Field(min_length=1)
+    segment_index: int = Field(ge=0)
+
+
+class VideoListItem(ApiModel):
+    id: str
+    title: str
+    original_filename: str
+    media_type: str
+    duration_seconds: float
+    resolution: str
+    codec: str
+    language: str
+    saved_at: str
+    index_status: str
+    index_level: str
+    confidence: float = Field(ge=0, le=1)
+    short_description: str
+    summary: str
+    subtitle_origin: str
+    asr_model: str | None = None
+    import_source: str
+    spoiler_protected: bool
+    organize_hint: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    progress: UserProgressRead | None = None
+
+
+class VideoDetail(VideoListItem):
+    assets: list[VideoAssetRead] = Field(default_factory=list)
+    subtitles: list[SubtitleRead] = Field(default_factory=list)
+    chapters: list[ChapterResult] = Field(default_factory=list)
+    transcript_segments: list[TranscriptSegmentRead] = Field(default_factory=list)
+
+
+class ProgressUpdate(ApiModel):
+    user_id: str = Field(default="demo-local", min_length=1, max_length=120)
+    position_seconds: float = Field(ge=0)
+    duration_seconds: float = Field(gt=0, le=86_400)
+
+
+class ProgressUpdateResponse(ApiModel):
+    video_id: str
+    progress: UserProgressRead

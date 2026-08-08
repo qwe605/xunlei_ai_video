@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppHeader } from '../components/AppHeader'
 import { AppSidebar } from '../components/AppSidebar'
 import { demoLibrary } from '../data/demoLibrary'
@@ -12,6 +12,7 @@ import {
   type AnalysisJob,
 } from '../features/analysis-queue/analysisQueue'
 import { createLocalAnalysis, readLocalAnalysis, type AnalysisMode } from '../api/analysis'
+import { readPersistedVideo, readPersistedVideos, saveWatchProgress } from '../api/videos'
 import { ImportVideoDialog } from '../features/import-video/ImportVideoDialog'
 import { navigateTo, routes, useAppRoute } from '../router'
 import type { LibraryFilter } from '../types/library'
@@ -73,6 +74,28 @@ export function App() {
   )
 
   useEffect(() => {
+    if (!session) return
+    let active = true
+    // 服务端片库是本地导入内容的事实来源；内置样例只在没有同名持久化记录时补充展示。
+    void readPersistedVideos()
+      .then((persistedVideos) => {
+        if (!active || persistedVideos.length === 0) return
+        setVideos([
+          ...persistedVideos,
+          ...demoLibrary.filter(
+            (demo) => !persistedVideos.some((video) => video.id === demo.id),
+          ),
+        ])
+      })
+      .catch(() => {
+        if (active) setVideos(demoLibrary)
+      })
+    return () => {
+      active = false
+    }
+  }, [session])
+
+  useEffect(() => {
     if (activeAnalysisId.current) return
     // 队列严格单任务执行，避免同一浏览器同时上传多个大视频拖垮本地模型服务。
     const nextJob = analysisJobs.find((job) => job.status === 'queued')
@@ -123,6 +146,11 @@ export function App() {
             video.durationSeconds,
             file,
             analysisMode,
+            {
+              title: video.title,
+              resolution: video.resolution,
+              codec: video.codec,
+            },
           )
           while (remoteJob.status === 'queued' || remoteJob.status === 'processing') {
             updateJob({
@@ -139,29 +167,14 @@ export function App() {
             throw new Error(remoteJob.detail)
           }
 
-          const result = remoteJob.result
-          const subtitlesUrl = URL.createObjectURL(
-            new Blob([result.subtitlesVtt], { type: 'text/vtt;charset=utf-8' }),
-          )
-          localObjectUrls.current.push(subtitlesUrl)
+          const persistedVideo = await readPersistedVideo(video.id)
           setVideos((current) =>
             current.map((item) =>
               item.id === video.id
                 ? videoSchema.parse({
-                    ...item,
-                    language: result.language,
-                    indexStatus: 'ready',
-                    indexLevel: 'L2',
-                    confidence: result.confidence,
-                    shortDescription: result.shortDescription,
-                    summary: result.summary,
-                    tags: result.tags,
-                    subtitlesUrl,
-                    subtitleOrigin: 'ai-generated',
-                    asrModel: result.asrModel,
-                    organizeHint: `AI 已生成字幕、摘要和 ${result.chapters.length} 个章节`,
-                    chapters: result.chapters,
-                    qa: [],
+                    ...persistedVideo,
+                    thumbnailUrl: item.thumbnailUrl ?? persistedVideo.thumbnailUrl,
+                    posterUrl: item.posterUrl,
                   })
                 : item,
             ),
@@ -238,6 +251,16 @@ export function App() {
   const openVideo = (video: Video) => navigateTo(routes.detail(video.id))
   const playVideo = (video: Video, startSeconds = 0) =>
     navigateTo(routes.player(video.id, startSeconds))
+  const updateWatchProgress = useCallback((targetVideo: Video, positionSeconds: number) => {
+    setVideos((current) =>
+      current.map((video) =>
+        video.id === targetVideo.id
+          ? { ...video, watchProgressSeconds: positionSeconds }
+          : video,
+      ),
+    )
+    void saveWatchProgress(targetVideo, positionSeconds).catch(() => undefined)
+  }, [])
   const retryAnalysis = (videoId: string) => {
     setVideos((current) =>
       current.map((video) =>
@@ -286,6 +309,7 @@ export function App() {
         video={selectedVideo}
         startSeconds={route.startSeconds}
         onBack={() => navigateTo(routes.detail(selectedVideo.id))}
+        onProgress={(positionSeconds) => updateWatchProgress(selectedVideo, positionSeconds)}
       />
     )
   }

@@ -17,6 +17,11 @@ async def create_analysis(
     video_id: str = Form(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._-]+$"),
     duration_seconds: float = Form(gt=0, le=86_400),
     analysis_mode: AnalysisMode = Form(default=AnalysisMode.fast),
+    title: str | None = Form(default=None, max_length=160),
+    resolution: str = Form(default="待识别", max_length=40),
+    codec: str = Form(default="待识别", max_length=80),
+    width: int | None = Form(default=None, ge=0, le=16_384),
+    height: int | None = Form(default=None, ge=0, le=16_384),
 ) -> AnalysisJob:
     # Controller 不保存文件、不接触 ORM，上传生命周期由 Service 统一负责。
     try:
@@ -25,6 +30,11 @@ async def create_analysis(
             video_id=video_id,
             duration_seconds=duration_seconds,
             analysis_mode=analysis_mode.value,
+            title=title,
+            resolution=resolution,
+            codec=codec,
+            width=width,
+            height=height,
         )
     except UploadValidationError as error:
         raise HTTPException(status_code=error.status_code, detail=error.detail) from error

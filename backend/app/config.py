@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
@@ -33,15 +33,18 @@ class Settings:
     minimax_model: str
     minimax_base_url: str
     preload_asr: bool
+    media_root: Path = field(default_factory=lambda: BACKEND_ROOT / "data" / "media")
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    default_database = (BACKEND_ROOT / "data" / "xunlei.db").as_posix()
+    data_root = BACKEND_ROOT / "data"
+    default_database = (data_root / "xunlei.db").as_posix()
     return Settings(
         app_name="迅雷 AI 片库分析服务",
         app_version="2.0.0",
         database_url=os.getenv("DATABASE_URL", f"sqlite:///{default_database}"),
+        media_root=Path(os.getenv("XUNLEI_MEDIA_ROOT", str(data_root / "media"))),
         max_upload_bytes=int(
             os.getenv("XUNLEI_MAX_UPLOAD_BYTES", str(300 * 1024 * 1024))
         ),

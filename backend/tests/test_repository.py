@@ -4,8 +4,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database.base import Base
-from app.database.repositories import AnalysisJobRepository
-from app.schemas import AnalysisJob, JobStatus
+from app.database.repositories import AnalysisJobRepository, VideoRepository
+from app.schemas import AnalysisJob, AnalysisResult, ChapterResult, JobStatus
 
 
 class AnalysisJobRepositoryTests(unittest.TestCase):
@@ -58,6 +58,70 @@ class AnalysisJobRepositoryTests(unittest.TestCase):
             recovered = repository.get("job-interrupted")
             self.assertEqual(recovered.status, JobStatus.failed)  # type: ignore[union-attr]
             self.assertEqual(recovered.error_code, "SERVICE_RESTARTED")  # type: ignore[union-attr]
+
+    def test_video_repository_persists_analysis_result_and_progress(self) -> None:
+        with self.session_factory.begin() as session:
+            repository = VideoRepository(session)
+            created = repository.create_placeholder(
+                video_id="video-persist",
+                owner_id="demo-local",
+                title="持久化样例",
+                original_filename="persist.mp4",
+                duration_seconds=60,
+                resolution="1280 × 720",
+                codec="本地 MP4",
+            )
+            self.assertEqual(created.index_status, "pending")
+
+            detail = repository.apply_analysis_result(
+                video_id="video-persist",
+                owner_id="demo-local",
+                result=AnalysisResult(
+                    language="中文（简体）",
+                    confidence=0.96,
+                    short_description="已经完成字幕和章节整理。",
+                    summary="这是一段用于验证持久化的视频。",
+                    tags=["持久化", "字幕"],
+                    subtitles_vtt=(
+                        "WEBVTT\n\n"
+                        "1\n00:00:00.000 --> 00:00:02.000\n第一句字幕\n\n"
+                        "2\n00:00:02.000 --> 00:00:05.000\n第二句字幕\n"
+                    ),
+                    asr_model="faster-whisper:large-v3",
+                    chapters=[
+                        ChapterResult(
+                            id="chapter-1",
+                            title="开场",
+                            start_seconds=0,
+                            end_seconds=30,
+                            summary="介绍视频主题。",
+                            source="subtitle",
+                            confidence=0.9,
+                            spoiler_level="none",
+                        )
+                    ],
+                ),
+            )
+            self.assertIsNotNone(detail)
+            self.assertEqual(detail.index_status, "ready")  # type: ignore[union-attr]
+            self.assertEqual(len(detail.subtitles), 1)  # type: ignore[union-attr]
+            self.assertEqual(len(detail.chapters), 1)  # type: ignore[union-attr]
+            self.assertEqual(len(detail.transcript_segments), 2)  # type: ignore[union-attr]
+
+            progress = repository.update_progress(
+                video_id="video-persist",
+                user_id="demo-local",
+                position_seconds=15,
+                duration_seconds=60,
+            )
+            self.assertEqual(progress.progress.last_position_seconds, 15)
+            self.assertAlmostEqual(progress.progress.completed_percent, 0.25)
+
+        with self.session_factory.begin() as session:
+            repository = VideoRepository(session)
+            videos = repository.list_by_owner("demo-local")
+            self.assertEqual(len(videos), 1)
+            self.assertEqual(videos[0].progress.completed_percent, 0.25)  # type: ignore[union-attr]
 
 
 if __name__ == "__main__":

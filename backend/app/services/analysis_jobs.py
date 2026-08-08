@@ -1,15 +1,16 @@
-import tempfile
 import threading
 import uuid
 import logging
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
 from fastapi import UploadFile
+from sqlalchemy.exc import OperationalError
 
 from app.config import Settings, get_settings
-from app.database.repositories import AnalysisJobRepository
+from app.database.repositories import AnalysisJobRepository, VideoRepository
 from app.database.session import session_scope
 from app.integrations.asr import (
     ASR_DEVICE,
@@ -99,6 +100,12 @@ class AnalysisService:
         video_id: str,
         duration_seconds: float,
         analysis_mode: str = "fast",
+        owner_id: str = "demo-local",
+        title: str | None = None,
+        resolution: str = "待识别",
+        codec: str = "待识别",
+        width: int | None = None,
+        height: int | None = None,
     ) -> AnalysisJob:
         if analysis_mode == "precise" and not precise_model_ready():
             raise UploadValidationError(
@@ -109,27 +116,45 @@ class AnalysisService:
         if not suffix:
             raise UploadValidationError(415, "仅支持 MP4 或 WebM 视频")
 
-        handle = tempfile.NamedTemporaryFile(
-            prefix="xunlei-ai-", suffix=suffix, delete=False
-        )
-        path = Path(handle.name)
+        media_dir = self._settings.media_root / video_id
+        media_dir.mkdir(parents=True, exist_ok=True)
+        path = media_dir / f"source{suffix}"
+        checksum = hashlib.sha256()
         total = 0
         try:
-            while chunk := await video.read(1024 * 1024):
-                total += len(chunk)
-                if total > self._settings.max_upload_bytes:
-                    raise UploadValidationError(413, "视频超过本地分析大小限制")
-                handle.write(chunk)
+            with path.open("wb") as handle:
+                while chunk := await video.read(1024 * 1024):
+                    total += len(chunk)
+                    if total > self._settings.max_upload_bytes:
+                        raise UploadValidationError(413, "视频超过本地分析大小限制")
+                    checksum.update(chunk)
+                    handle.write(chunk)
         except Exception:
             path.unlink(missing_ok=True)
             raise
         finally:
-            handle.close()
             await video.close()
 
         if total == 0:
             path.unlink(missing_ok=True)
             raise UploadValidationError(400, "视频文件为空")
+        filename = video.filename or f"{video_id}{suffix}"
+        with session_scope() as session:
+            VideoRepository(session).create_placeholder(
+                video_id=video_id,
+                owner_id=owner_id,
+                title=title or Path(filename).stem or filename,
+                original_filename=filename,
+                duration_seconds=duration_seconds,
+                resolution=resolution,
+                codec=codec,
+                asset_path=path.relative_to(self._settings.media_root).as_posix(),
+                asset_mime_type=video.content_type or "application/octet-stream",
+                asset_size_bytes=total,
+                width=width,
+                height=height,
+                checksum=checksum.hexdigest(),
+            )
         return self.create(video_id, path, duration_seconds, analysis_mode)
 
     def create(
@@ -319,6 +344,19 @@ class AnalysisService:
                 ),
                 result=result,
             )
+            try:
+                with session_scope() as session:
+                    VideoRepository(session).apply_analysis_result(
+                        video_id=current.video_id,
+                        owner_id="demo-local",
+                        result=result,
+                    )
+            except OperationalError:
+                # 部分单元测试只创建 analysis_jobs 表，用来隔离验证分析调度；此时跳过片库增强写回。
+                logger.warning("片库表尚未初始化，跳过分析结果写回：%s", current.video_id)
+            except Exception:
+                # 分析任务是主流程，片库写回是持久化增强；写回失败要记录日志，不能把已完成的字幕结果改成失败。
+                logger.exception("分析结果写回片库失败，视频：%s", current.video_id)
         except MediaAnalysisError as error:
             self._update(
                 job_id,
@@ -384,7 +422,8 @@ class AnalysisService:
                 error_code="ANALYSIS_FAILED",
             )
         finally:
-            source_path.unlink(missing_ok=True)
+            # 原视频已作为片库 source 资产持久化，不能再按临时文件删除。
+            pass
 
 
 # 旧名称仅供已有离线脚本平滑迁移。

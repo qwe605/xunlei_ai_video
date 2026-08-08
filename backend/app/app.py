@@ -7,6 +7,7 @@ from app.config import get_settings
 from app.controllers import api_router
 from app.database.session import init_database
 from app.services.analysis_jobs import AnalysisService
+from app.services.library import LibraryService
 
 
 @asynccontextmanager
@@ -15,6 +16,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     init_database()
     service = AnalysisService()
     application.state.analysis_service = service
+    application.state.library_service = LibraryService()
     try:
         yield
     finally:

@@ -28,7 +28,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 def init_database() -> None:
     # 导入实体后 SQLAlchemy 才能把全部表注册到 metadata。
-    from app.database.models.analysis_job import AnalysisJobRecord  # noqa: F401
+    import app.database.models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
 

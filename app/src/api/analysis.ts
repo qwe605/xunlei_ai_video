@@ -58,12 +58,24 @@ export async function createLocalAnalysis(
   durationSeconds: number,
   file: File,
   analysisMode: AnalysisMode = 'fast',
+  metadata?: {
+    title?: string
+    resolution?: string
+    codec?: string
+    width?: number
+    height?: number
+  },
 ): Promise<LocalAnalysisJob> {
   const body = new FormData()
   body.set('video_id', videoId)
   body.set('duration_seconds', String(durationSeconds))
   body.set('video', file)
   body.set('analysis_mode', analysisMode)
+  if (metadata?.title) body.set('title', metadata.title)
+  if (metadata?.resolution) body.set('resolution', metadata.resolution)
+  if (metadata?.codec) body.set('codec', metadata.codec)
+  if (metadata?.width !== undefined) body.set('width', String(metadata.width))
+  if (metadata?.height !== undefined) body.set('height', String(metadata.height))
   return parseResponse(
     await fetch('/api/v1/analyses', {
       method: 'POST',
