@@ -13,6 +13,7 @@ from app.schemas import (
     UserProgressRead,
     SubtitleRead,
     VideoAssetRead,
+    VideoDeleteResponse,
     VideoDetail,
     VideoListItem,
 )
@@ -136,6 +137,11 @@ class FakeLibraryService:
             is_active=True,
         )
 
+    def delete_video(self, **arguments: object) -> VideoDeleteResponse:
+        if arguments["video_id"] != "video-api":
+            raise LookupError("视频不存在或无权访问")
+        return VideoDeleteResponse(video_id="video-api", deleted_assets=2)
+
 
 class ControllerTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -238,6 +244,10 @@ class ControllerTests(unittest.TestCase):
         subtitle = self.client.get("/api/v1/videos/video-api/subtitles/active")
         self.assertEqual(subtitle.status_code, 200)
         self.assertIn("WEBVTT", subtitle.text)
+
+        deleted = self.client.delete("/api/v1/videos/video-api")
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(deleted.json()["deletedAssets"], 2)
 
 
 if __name__ == "__main__":

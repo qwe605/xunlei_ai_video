@@ -240,7 +240,7 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
         <header className="import-dialog-header">
           <div>
             <h2 id="import-title">导入真实视频</h2>
-            <p>视频会安全上传到分析服务，任务结束后自动删除临时原文件。</p>
+            <p>视频会安全上传到分析服务，生成字幕和章节后保存到片库。</p>
           </div>
           <button type="button" className="icon-button" onClick={close} aria-label="关闭导入窗口">
             <X size={19} />
@@ -349,8 +349,7 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
             <div className="analysis-privacy-note">
               <AlertCircle size={16} />
               <p>
-                视频仅用于生成字幕，处理完成后删除临时文件；MiniMax-M3 会在一次请求中保守
-                校对低置信词并生成摘要。
+                视频仅用于生成字幕、摘要和章节；MiniMax-M3 会在一次请求中保守校对低置信词。
               </p>
             </div>
           </div>

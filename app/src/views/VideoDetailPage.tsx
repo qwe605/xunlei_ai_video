@@ -9,6 +9,7 @@ import {
   EyeOff,
   Play,
   Sparkles,
+  Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
@@ -20,11 +21,25 @@ interface VideoDetailPageProps {
   video: Video
   onBack: () => void
   onPlay: (video: Video, startSeconds?: number) => void
+  onDelete: (video: Video) => Promise<void>
 }
 
-export function VideoDetailPage({ video, onBack, onPlay }: VideoDetailPageProps) {
+export function VideoDetailPage({ video, onBack, onPlay, onDelete }: VideoDetailPageProps) {
   const [spoilersVisible, setSpoilersVisible] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleting, setDeleting] = useState(false)
   const progress = Math.round((video.watchProgressSeconds / video.durationSeconds) * 100)
+  const deleteVideo = async () => {
+    if (!window.confirm(`确定从片库删除《${video.title}》吗？`)) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      await onDelete(video)
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : '删除失败，请稍后重试')
+      setDeleting(false)
+    }
+  }
 
   return (
     <main className="page detail-page" id="main-content">
@@ -73,7 +88,7 @@ export function VideoDetailPage({ video, onBack, onPlay }: VideoDetailPageProps)
               </a>
             </p>
           ) : (
-            <p className="source-attribution">本次会话导入，分析完成后已删除服务端临时文件</p>
+            <p className="source-attribution">本地导入视频，源文件与 AI 结果已保存在服务端片库</p>
           )}
           <p className={`subtitle-origin ${video.subtitleOrigin}`}>
             {video.subtitleOrigin === 'provided' && '字幕来源：原视频英文字幕'}
@@ -93,7 +108,23 @@ export function VideoDetailPage({ video, onBack, onPlay }: VideoDetailPageProps)
               <Edit3 size={17} aria-hidden="true" />
               纠正信息
             </button>
+            {video.importSource === 'local' && (
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={deleteVideo}
+                disabled={deleting}
+              >
+                <Trash2 size={17} aria-hidden="true" />
+                {deleting ? '正在删除' : '删除视频'}
+              </button>
+            )}
           </div>
+          {deleteError && (
+            <p className="field-error" role="alert">
+              {deleteError}
+            </p>
+          )}
         </div>
       </section>
 

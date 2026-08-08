@@ -4,7 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 
 from app.dependencies import get_library_service
-from app.schemas import ProgressUpdate, ProgressUpdateResponse, VideoDetail, VideoListItem
+from app.schemas import (
+    ProgressUpdate,
+    ProgressUpdateResponse,
+    VideoDeleteResponse,
+    VideoDetail,
+    VideoListItem,
+)
 from app.services.library import LibraryService
 
 
@@ -68,6 +74,20 @@ def get_video_media(
         raise HTTPException(status_code=404, detail="视频不存在或无权访问")
     path, asset = resolved
     return FileResponse(path, media_type=asset.mime_type, filename=path.name)
+
+
+@router.delete("/{video_id}", response_model=VideoDeleteResponse)
+def delete_video(
+    video_id: str,
+    service: Annotated[LibraryService, Depends(get_library_service)],
+    owner_id: str = "demo-local",
+) -> VideoDeleteResponse:
+    try:
+        return service.delete_video(video_id=video_id, owner_id=owner_id)
+    except PermissionError as error:
+        raise HTTPException(status_code=403, detail="无权删除该视频资产") from error
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @router.get("/{video_id}/assets/poster")

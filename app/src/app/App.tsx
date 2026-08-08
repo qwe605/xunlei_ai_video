@@ -12,7 +12,12 @@ import {
   type AnalysisJob,
 } from '../features/analysis-queue/analysisQueue'
 import { createLocalAnalysis, readLocalAnalysis, type AnalysisMode } from '../api/analysis'
-import { readPersistedVideo, readPersistedVideos, saveWatchProgress } from '../api/videos'
+import {
+  deletePersistedVideo,
+  readPersistedVideo,
+  readPersistedVideos,
+  saveWatchProgress,
+} from '../api/videos'
 import { ImportVideoDialog } from '../features/import-video/ImportVideoDialog'
 import { navigateTo, routes, useAppRoute } from '../router'
 import type { LibraryFilter } from '../types/library'
@@ -139,7 +144,7 @@ export function App() {
           updateJob({
             stage: '上传到 AI 分析服务',
             progress: 8,
-            detail: '正在安全上传视频，分析完成后服务端会删除原始临时文件。',
+            detail: '正在安全上传视频，分析完成后会写入服务端片库。',
           })
           const analysisMode = localAnalysisModes.current.get(video.id) ?? nextJob.analysisMode
           let remoteJob = await createLocalAnalysis(
@@ -263,6 +268,12 @@ export function App() {
     )
     void saveWatchProgress(targetVideo, positionSeconds).catch(() => undefined)
   }, [])
+  const deleteVideo = useCallback(async (targetVideo: Video) => {
+    await deletePersistedVideo(targetVideo.id)
+    setVideos((current) => current.filter((video) => video.id !== targetVideo.id))
+    setAnalysisJobs((current) => current.filter((job) => job.videoId !== targetVideo.id))
+    navigateTo(routes.library())
+  }, [])
   const retryAnalysis = (videoId: string) => {
     setVideos((current) =>
       current.map((video) =>
@@ -367,6 +378,7 @@ export function App() {
             video={selectedVideo}
             onBack={() => navigateTo(routes.library())}
             onPlay={playVideo}
+            onDelete={deleteVideo}
           />
         )}
       </div>

@@ -373,6 +373,75 @@ test('服务端片库刷新后仍能恢复本地导入视频和观看进度', as
   await expect(page).toHaveURL(/\/videos\/persisted-local-video\/play\?t=12$/)
 })
 
+test('本地导入视频可以从详情页删除并同步移出片库', async ({ page }) => {
+  let deleted = false
+  const localVideo = {
+    id: 'delete-local-video',
+    title: '可删除导入样例',
+    originalFilename: 'delete-local-video.mp4',
+    mediaType: 'other',
+    durationSeconds: 60,
+    resolution: '1280 × 720',
+    codec: '本地 MP4',
+    language: '中文（简体）',
+    savedAt: new Date('2026-08-08T10:00:00Z').toISOString(),
+    indexStatus: 'ready',
+    indexLevel: 'L2',
+    confidence: 0.94,
+    shortDescription: '用于验证删除链路。',
+    summary: '删除后该视频应从当前片库列表移除。',
+    subtitleOrigin: 'ai-generated',
+    asrModel: 'FunASR Paraformer-zh · CPU + MiniMax-M3',
+    importSource: 'local',
+    spoilerProtected: false,
+    organizeHint: 'AI 已生成字幕、摘要和 1 个章节',
+    hasPoster: false,
+    tags: ['删除'],
+    progress: null,
+    chapters: [
+      {
+        id: 'delete-chapter-1',
+        title: '删除验证',
+        startSeconds: 0,
+        endSeconds: 60,
+        summary: '验证详情页删除入口。',
+        source: 'subtitle',
+        confidence: 0.94,
+        spoilerLevel: 'none',
+      },
+    ],
+  }
+  await page.route('**/api/v1/videos', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(deleted ? [] : [localVideo]),
+    })
+  })
+  await page.route('**/api/v1/videos/delete-local-video', async (route) => {
+    if (route.request().method() === 'DELETE') {
+      deleted = true
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ videoId: 'delete-local-video', deletedAssets: 2 }),
+      })
+      return
+    }
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(localVideo) })
+  })
+  page.on('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('可删除导入样例')
+    await dialog.accept()
+  })
+
+  await openLibraryAsLoggedInUser(page, '/', 'delete-local')
+  await page.getByRole('article').filter({ hasText: 'delete-local-video.mp4' }).getByRole('button', { name: '查看详情' }).click()
+  await expect(page.getByRole('button', { name: '删除视频' })).toBeVisible()
+  await page.getByRole('button', { name: '删除视频' }).click()
+  await expect(page.getByRole('heading', { name: '全部视频' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '可删除导入样例' })).toHaveCount(0)
+  expect(deleted).toBe(true)
+})
+
 test('精准模型未安装时不允许提交精准任务', async ({ page }) => {
   await page.route('**/api/v1/health', async (route) => {
     await route.fulfill({

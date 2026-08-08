@@ -112,3 +112,13 @@ export async function saveWatchProgress(video: Video, positionSeconds: number): 
     }),
   })
 }
+
+export async function deletePersistedVideo(videoId: string): Promise<void> {
+  const response = await fetch(`/api/v1/videos/${encodeURIComponent(videoId)}`, {
+    method: 'DELETE',
+  })
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { detail?: string } | null
+    throw new Error(body?.detail ?? '删除视频失败')
+  }
+}

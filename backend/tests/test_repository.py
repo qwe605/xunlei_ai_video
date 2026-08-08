@@ -123,6 +123,26 @@ class AnalysisJobRepositoryTests(unittest.TestCase):
             self.assertEqual(len(videos), 1)
             self.assertEqual(videos[0].progress.completed_percent, 0.25)  # type: ignore[union-attr]
 
+    def test_video_repository_deletes_video_and_returns_asset_paths(self) -> None:
+        with self.session_factory.begin() as session:
+            repository = VideoRepository(session)
+            repository.create_placeholder(
+                video_id="video-delete",
+                owner_id="demo-local",
+                title="待删除样例",
+                original_filename="delete.mp4",
+                duration_seconds=30,
+                asset_path="video-delete/source.mp4",
+                asset_mime_type="video/mp4",
+                asset_size_bytes=10,
+                poster_path="video-delete/poster.jpg",
+                poster_mime_type="image/jpeg",
+                poster_size_bytes=8,
+            )
+            paths = repository.delete_video("video-delete", "demo-local")
+            self.assertEqual(paths, ["video-delete/source.mp4", "video-delete/poster.jpg"])
+            self.assertEqual(repository.list_by_owner("demo-local"), [])
+
 
 if __name__ == "__main__":
     unittest.main()

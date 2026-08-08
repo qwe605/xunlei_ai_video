@@ -190,6 +190,15 @@ class VideoRepository:
             return None
         return next((item for item in record.subtitles if item.is_active), None)
 
+    def delete_video(self, video_id: str, owner_id: str) -> list[str] | None:
+        record = self._load_video(video_id, owner_id)
+        if record is None:
+            return None
+        asset_paths = [asset.storage_path for asset in record.assets]
+        self._session.delete(record)
+        self._session.flush()
+        return asset_paths
+
     def update_progress(
         self,
         *,

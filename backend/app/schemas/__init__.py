@@ -158,3 +158,8 @@ class ProgressUpdate(ApiModel):
 class ProgressUpdateResponse(ApiModel):
     video_id: str
     progress: UserProgressRead
+
+
+class VideoDeleteResponse(ApiModel):
+    video_id: str
+    deleted_assets: int = Field(ge=0)
