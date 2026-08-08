@@ -2,7 +2,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile.backend
+      dockerfile: ${XUNLEI_BACKEND_DOCKERFILE:-Dockerfile.backend}
     environment:
       DATABASE_URL: sqlite:////data/xunlei.db
       XUNLEI_MEDIA_ROOT: /data/media

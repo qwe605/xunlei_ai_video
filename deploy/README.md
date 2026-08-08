@@ -17,6 +17,21 @@ docker compose up --build
 - 前端：`http://127.0.0.1:8080`
 - 后端健康检查：`http://127.0.0.1:8080/api/v1/health`
 
+## 腾讯云轻量部署
+
+腾讯云小规格服务器建议在根目录 `.env` 中增加：
+
+```env
+XUNLEI_BACKEND_DOCKERFILE=Dockerfile.backend.cloud
+XUNLEI_WEB_PORT=18080
+XUNLEI_PRELOAD_ASR=false
+XUNLEI_PUBLIC_BASE_URL=http://公网IP:18080
+```
+
+`Dockerfile.backend.cloud` 只安装 FastAPI、SQLite、PyAV、ffmpeg、MiniMax 与火山 ASR API 所需依赖，不安装
+`torch`、`FunASR`、`faster-whisper` 和 `stable-ts`。这样公网 Demo 可以稳定使用 ASR API 识别；本地
+Whisper large-v3 精准模式仍保留给安装包或高配私有部署。
+
 ## 数据与模型
 
 - `xunlei-data`：保存 SQLite 数据库和上传媒体。
