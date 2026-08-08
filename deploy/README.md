@@ -33,6 +33,11 @@ XUNLEI_PUBLIC_BASE_URL=http://公网IP:18080
 Whisper large-v3 精准模式仍保留给安装包或高配私有部署。镜像构建时直接使用基础镜像内置 pip，
 避免公网服务器因为额外下载 pip 或系统包而长时间阻塞。
 
+如果服务器 80/443 端口已有其他业务，不要覆盖原域名配置。当前腾讯云演示采用“IP 兜底入口”：
+Compose 仍监听 `18080`，宿主机 Nginx 只新增 `server_name 62.234.39.243 _` 的
+`default_server`，把 `http://62.234.39.243/` 反向代理到 `http://127.0.0.1:18080`。
+已有 `weilai.wit-motion.cn` 精确域名仍命中原来的站点配置。
+
 ## 数据与模型
 
 - `xunlei-data`：保存 SQLite 数据库和上传媒体。
