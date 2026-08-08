@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "harness_version": "1.0.0",
+  "project": "xunlei-ai-video-library",
+  "required_skills": [
+    "documentation-and-adrs",
+    "llm-evaluation",
+    "playwright-best-practices",
+    "code-review-and-quality",
+    "verification-before-completion"
+  ],
+  "promotion_policy": {
+    "train_must_not_regress": true,
+    "holdout_must_not_regress": true,
+    "combined_pass_count_must_increase": true,
+    "high_risk_changes_require_independent_review": true,
+    "one_primary_harness_change_per_candidate": true
+  },
+  "artifact_policy": {
+    "receipt_path": "output/run-receipt.json",
+    "failure_artifacts": [
+      "app/playwright-report",
+      "app/test-results"
+    ],
+    "privacy_rule": "不得记录用户视频、字幕、密钥或未经脱敏的绝对个人路径"
+  }
+}
+

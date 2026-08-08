@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "baseline_id": "baseline-2026-07-29",
+  "harness_version": "1.0.0",
+  "status": "verified",
+  "git_revision": null,
+  "recorded_at": "2026-07-29T13:20:00Z",
+  "verification_receipt": "output/harness-runs/XL-SUBMISSION-FINAL-20260729.json",
+  "automated_checks": {
+    "lint": true,
+    "unit": true,
+    "build": true,
+    "audit": true,
+    "e2e": true,
+    "visual_regression": true
+  },
+  "test_counts": {
+    "unit": 10,
+    "e2e_desktop_and_mobile": 10,
+    "visual_snapshots": 8
+  },
+  "eval_score": {
+    "train_passed": null,
+    "train_total": 8,
+    "holdout_passed": null,
+    "holdout_total": 4
+  },
+  "notes": [
+    "自动检查基线通过统一验证，具体环境、源码指纹和耗时以运行凭证为准。",
+    "仓库已初始化但尚无用户确认的基线提交，因此 git_revision 保持 null。",
+    "任务型训练/留出评测需要在隔离 worktree 中逐项运行，不能用产品测试结果代替。"
+  ]
+}

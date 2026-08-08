@@ -1,0 +1,131 @@
+[
+  {
+    "id": "T01",
+    "split": "train",
+    "title": "章节标题修改不破坏时间跳转",
+    "task": "修改一个智能章节标题，保持 schema 合法并确保点击后仍跳到原起始时间。",
+    "risk": "medium",
+    "automated_checks": [
+      "schema 单元测试通过",
+      "桌面与移动 E2E 通过",
+      "视频 currentTime 断言保持原值"
+    ],
+    "human_checks": [
+      "标题准确概括章节内容",
+      "没有修改无关章节"
+    ]
+  },
+  {
+    "id": "T02",
+    "split": "train",
+    "title": "无证据问题必须拒答",
+    "task": "新增一条视频中不存在的问题样例，返回统一拒答且不生成时间引用。",
+    "risk": "high",
+    "automated_checks": [
+      "问答 schema 校验通过",
+      "拒答 E2E 通过",
+      "页面不存在伪造时间按钮"
+    ],
+    "human_checks": [
+      "拒答语气清楚且不责怪用户",
+      "没有使用模型常识补充答案"
+    ]
+  },
+  {
+    "id": "T03",
+    "split": "train",
+    "title": "补充加载失败状态",
+    "task": "为视频索引加载失败增加可恢复状态，并保持现有成功路径不变。",
+    "risk": "medium",
+    "automated_checks": [
+      "失败状态组件测试通过",
+      "核心 E2E 通过",
+      "浏览器控制台无错误"
+    ],
+    "human_checks": [
+      "错误信息说明下一步动作",
+      "失败状态符合现有视觉语言"
+    ]
+  },
+  {
+    "id": "T04",
+    "split": "train",
+    "title": "移动端章节面板调整",
+    "task": "调整移动端章节面板布局，保证长标题、时间和关闭按钮不重叠。",
+    "risk": "medium",
+    "automated_checks": [
+      "390px 视口没有横向滚动",
+      "移动端视觉基线通过",
+      "章节点击 E2E 通过"
+    ],
+    "human_checks": [
+      "长标题仍可读",
+      "主要操作单手可达"
+    ]
+  },
+  {
+    "id": "T05",
+    "split": "train",
+    "title": "检索字段向后兼容迁移",
+    "task": "新增一个可检索元数据字段，迁移样例数据并保持旧字段排序行为。",
+    "risk": "high",
+    "automated_checks": [
+      "Zod schema 测试通过",
+      "新增字段排序测试通过",
+      "旧查询回归测试通过"
+    ],
+    "human_checks": [
+      "字段具有明确产品价值",
+      "没有为单个样例硬编码权重"
+    ]
+  },
+  {
+    "id": "T06",
+    "split": "train",
+    "title": "不可信文本安全渲染",
+    "task": "增加包含 HTML 片段的字幕样例，确保界面按纯文本渲染。",
+    "risk": "high",
+    "automated_checks": [
+      "恶意标签不会创建 DOM 节点",
+      "页面无脚本执行",
+      "安全与核心 E2E 通过"
+    ],
+    "human_checks": [
+      "修复覆盖所有 AI 文本入口",
+      "没有使用危险的转义绕过"
+    ]
+  },
+  {
+    "id": "T07",
+    "split": "train",
+    "title": "受控依赖升级",
+    "task": "升级一个开发依赖，只修改必要锁文件并验证无行为回归。",
+    "risk": "medium",
+    "automated_checks": [
+      "npm audit 无高危漏洞",
+      "Lint、单测、构建和 E2E 通过",
+      "锁文件可由 npm ci 重现"
+    ],
+    "human_checks": [
+      "没有夹带无关依赖升级",
+      "升级理由与风险已记录"
+    ]
+  },
+  {
+    "id": "T08",
+    "split": "train",
+    "title": "能力边界文档同步",
+    "task": "更新一项 Demo 能力说明，确保 Markdown、PDF 和产品实际行为一致。",
+    "risk": "high",
+    "automated_checks": [
+      "文档链接检查通过",
+      "PDF 构建成功",
+      "关键术语一致性检查通过"
+    ],
+    "human_checks": [
+      "没有把预生成能力描述为线上实时 AI",
+      "评委无需工程背景即可理解"
+    ]
+  }
+]
+

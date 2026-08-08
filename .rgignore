@@ -1,0 +1,13 @@
+# 默认搜索只覆盖自有源码和文档，减少生成代码对代理上下文的污染。
+app/node_modules/
+app/dist/
+app/playwright-report/
+app/test-results/
+output/
+tmp/
+references/**
+!references/README.md
+**/.git/
+*.min.js
+*.map
+
