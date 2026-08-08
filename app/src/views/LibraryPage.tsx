@@ -1,4 +1,15 @@
-import { ArrowUpDown, Film, Filter, Grid2X2, List, Search, Sparkles } from 'lucide-react'
+import {
+  ArrowUpDown,
+  Captions,
+  Clock3,
+  Film,
+  Filter,
+  Grid2X2,
+  List,
+  Search,
+  Sparkles,
+  Zap,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { Video } from '../data/schema'
 import { VideoCard } from '../components/VideoCard'
@@ -43,6 +54,19 @@ export function LibraryPage({
   onDismissAnalysis,
 }: LibraryPageProps) {
   const [sort, setSort] = useState<'saved' | 'name' | 'progress'>('saved')
+  const benefitMetrics = useMemo(() => {
+    const readyVideos = videos.filter((video) => video.indexStatus === 'ready')
+    const subtitleSeconds = readyVideos.reduce((total, video) => total + video.durationSeconds, 0)
+    const chapterCount = readyVideos.reduce((total, video) => total + video.chapters.length, 0)
+    // Demo 阶段用保守估算：有章节和搜索后，用户少拖动约 18% 的视频时长。
+    const savedMinutes = Math.round((subtitleSeconds * 0.18) / 60)
+    return {
+      readyCount: readyVideos.length,
+      subtitleHours: Math.max(0.1, subtitleSeconds / 3600).toFixed(1),
+      chapterCount,
+      savedMinutes,
+    }
+  }, [videos])
 
   const visibleVideos = useMemo(() => {
     const filtered = videos.filter((video) => {
@@ -94,6 +118,37 @@ export function LibraryPage({
               {prompt}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section className="benefit-strip" aria-label="AI 整理收益">
+        <div>
+          <Captions size={18} aria-hidden="true" />
+          <span>
+            <strong>{benefitMetrics.subtitleHours} 小时</strong>
+            <small>已生成字幕时长</small>
+          </span>
+        </div>
+        <div>
+          <Zap size={18} aria-hidden="true" />
+          <span>
+            <strong>{benefitMetrics.chapterCount} 个</strong>
+            <small>可直达章节</small>
+          </span>
+        </div>
+        <div>
+          <Clock3 size={18} aria-hidden="true" />
+          <span>
+            <strong>{benefitMetrics.savedMinutes} 分钟</strong>
+            <small>预计少拖动时间</small>
+          </span>
+        </div>
+        <div>
+          <Sparkles size={18} aria-hidden="true" />
+          <span>
+            <strong>{benefitMetrics.readyCount} 个</strong>
+            <small>精准整理权益</small>
+          </span>
         </div>
       </section>
 
