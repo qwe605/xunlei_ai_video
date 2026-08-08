@@ -13,6 +13,9 @@ from app.schemas import (
     SearchRequest,
     SearchResponse,
     SearchResultItem,
+    FeedbackCreate,
+    FeedbackRead,
+    FeedbackSummary,
     UserProgressRead,
     SubtitleRead,
     VideoAssetRead,
@@ -190,6 +193,28 @@ class FakeQuestionService:
         )
 
 
+class FakeFeedbackService:
+    def __init__(self) -> None:
+        self.payload: FeedbackCreate | None = None
+
+    def create_feedback(self, payload: FeedbackCreate) -> FeedbackRead:
+        self.payload = payload
+        return FeedbackRead(
+            **payload.model_dump(),
+            id="feedback-api",
+            status="received",
+        )
+
+    def summary(self, user_id: str = "demo-local") -> FeedbackSummary:
+        return FeedbackSummary(
+            user_id=user_id,
+            total=1,
+            helpful=1,
+            not_relevant=0,
+            correction=0,
+        )
+
+
 class ControllerTests(unittest.TestCase):
     def setUp(self) -> None:
         application = FastAPI()
@@ -198,10 +223,12 @@ class ControllerTests(unittest.TestCase):
         self.library_service = FakeLibraryService()
         self.search_service = FakeSearchService()
         self.question_service = FakeQuestionService()
+        self.feedback_service = FakeFeedbackService()
         application.state.analysis_service = self.service
         application.state.library_service = self.library_service
         application.state.search_service = self.search_service
         application.state.question_service = self.question_service
+        application.state.feedback_service = self.feedback_service
         self.client = TestClient(application)
 
     def tearDown(self) -> None:
@@ -319,6 +346,26 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "no_evidence")
         self.assertEqual(self.question_service.payload.question, "有没有讲登录失效？")  # type: ignore[union-attr]
+
+    def test_feedback_endpoint_persists_ai_feedback(self) -> None:
+        created = self.client.post(
+            "/api/v1/feedback",
+            json={
+                "userId": "demo-local",
+                "videoId": "video-api",
+                "targetType": "search_result",
+                "targetId": "query::video-api",
+                "feedbackType": "not_relevant",
+                "content": "这个结果不相关",
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["id"], "feedback-api")
+        self.assertEqual(self.feedback_service.payload.feedback_type, "not_relevant")  # type: ignore[union-attr]
+
+        summary = self.client.get("/api/v1/feedback/summary")
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(summary.json()["helpful"], 1)
 
 
 if __name__ == "__main__":

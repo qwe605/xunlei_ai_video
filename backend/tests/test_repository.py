@@ -4,8 +4,20 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database.base import Base
-from app.database.repositories import AnalysisJobRepository, SearchRepository, VideoRepository
-from app.schemas import AnalysisJob, AnalysisResult, ChapterResult, JobStatus, SearchRequest
+from app.database.repositories import (
+    AnalysisJobRepository,
+    FeedbackRepository,
+    SearchRepository,
+    VideoRepository,
+)
+from app.schemas import (
+    AnalysisJob,
+    AnalysisResult,
+    ChapterResult,
+    FeedbackCreate,
+    JobStatus,
+    SearchRequest,
+)
 from app.schemas import VideoQuestionRequest
 from app.integrations.minimax import MinimaxSummaryError
 from app.services.questions import QuestionService
@@ -146,6 +158,25 @@ class AnalysisJobRepositoryTests(unittest.TestCase):
             paths = repository.delete_video("video-delete", "demo-local")
             self.assertEqual(paths, ["video-delete/source.mp4", "video-delete/poster.jpg"])
             self.assertEqual(repository.list_by_owner("demo-local"), [])
+
+    def test_feedback_repository_creates_feedback_and_summary(self) -> None:
+        with self.session_factory.begin() as session:
+            repository = FeedbackRepository(session)
+            created = repository.create(
+                FeedbackCreate(
+                    user_id="demo-local",
+                    video_id="video-api",
+                    target_type="video_answer",
+                    target_id="answer-1",
+                    feedback_type="helpful",
+                    content="回答有帮助",
+                )
+            )
+            self.assertEqual(created.status, "received")
+            summary = repository.summary("demo-local")
+
+        self.assertEqual(summary.total, 1)
+        self.assertEqual(summary.helpful, 1)
 
     def test_search_repository_returns_orm_corpus_for_owner(self) -> None:
         with self.session_factory.begin() as session:

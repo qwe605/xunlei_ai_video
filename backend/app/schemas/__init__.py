@@ -210,3 +210,25 @@ class VideoQuestionResponse(ApiModel):
     answer: str | None = Field(default=None, max_length=260)
     confidence: float = Field(default=0, ge=0, le=1)
     citations: list[SearchCitation] = Field(default_factory=list, max_length=3)
+
+
+class FeedbackCreate(ApiModel):
+    user_id: str = Field(default="demo-local", min_length=1, max_length=120)
+    video_id: str | None = Field(default=None, max_length=100)
+    target_type: str = Field(pattern="^(search_result|video_answer|chapter|subtitle)$")
+    target_id: str = Field(min_length=1, max_length=160)
+    feedback_type: str = Field(pattern="^(helpful|not_relevant|correction)$")
+    content: str | None = Field(default=None, max_length=500)
+
+
+class FeedbackRead(FeedbackCreate):
+    id: str
+    status: str
+
+
+class FeedbackSummary(ApiModel):
+    user_id: str
+    total: int = Field(ge=0)
+    helpful: int = Field(ge=0)
+    not_relevant: int = Field(ge=0)
+    correction: int = Field(ge=0)

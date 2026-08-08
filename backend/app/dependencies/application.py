@@ -2,6 +2,7 @@ from fastapi import Request
 
 from app.config import Settings, get_settings
 from app.services.analysis_jobs import AnalysisService
+from app.services.feedback import FeedbackService
 from app.services.library import LibraryService
 from app.services.questions import QuestionService
 from app.services.search import SearchService
@@ -26,4 +27,8 @@ def get_search_service(request: Request) -> SearchService:
 
 def get_question_service(request: Request) -> QuestionService:
     return request.app.state.question_service
+
+
+def get_feedback_service(request: Request) -> FeedbackService:
+    return request.app.state.feedback_service
 """FastAPI 依赖注入入口，Controller 不自行构造全局服务。"""

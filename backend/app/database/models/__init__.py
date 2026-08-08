@@ -1,4 +1,5 @@
 from app.database.models.analysis_job import AnalysisJobRecord
+from app.database.models.feedback import AiFeedbackRecord
 from app.database.models.video_library import (
     ChapterRecord,
     SubtitleRecord,
@@ -11,6 +12,7 @@ from app.database.models.video_library import (
 
 __all__ = [
     "AnalysisJobRecord",
+    "AiFeedbackRecord",
     "ChapterRecord",
     "SubtitleRecord",
     "TranscriptSegmentRecord",

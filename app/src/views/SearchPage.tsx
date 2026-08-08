@@ -1,5 +1,6 @@
 import { ArrowLeft, CirclePlay, FileText, Play, Search, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { submitFeedback } from '../api/feedback'
 import { searchPersistedVideos } from '../api/search'
 import { EmptyState } from '../components/EmptyState'
 import { StatusBadge } from '../components/StatusBadge'
@@ -20,8 +21,27 @@ export function SearchPage({ query, videos, onBack, onOpen, onPlay }: SearchPage
   const [mode, setMode] = useState<SearchMode>('ai')
   const [backendResults, setBackendResults] = useState<ReturnType<typeof searchLibrary> | null>(null)
   const [searching, setSearching] = useState(false)
+  const [feedbackByResult, setFeedbackByResult] = useState<Record<string, string>>({})
   const localResults = useMemo(() => searchLibrary(query, mode, videos), [mode, query, videos])
   const results = backendResults && backendResults.length > 0 ? backendResults : localResults
+
+  const sendSearchFeedback = (videoId: string) => {
+    const targetId = `${query.trim()}::${videoId}`
+    setFeedbackByResult((current) => ({ ...current, [videoId]: '正在保存反馈' }))
+    void submitFeedback({
+      videoId,
+      targetType: 'search_result',
+      targetId,
+      feedbackType: 'not_relevant',
+      content: query.trim(),
+    })
+      .then(() =>
+        setFeedbackByResult((current) => ({ ...current, [videoId]: '已记录不相关' })),
+      )
+      .catch(() =>
+        setFeedbackByResult((current) => ({ ...current, [videoId]: '反馈暂未保存' })),
+      )
+  }
 
   useEffect(() => {
     const trimmedQuery = query.trim()
@@ -170,6 +190,13 @@ export function SearchPage({ query, videos, onBack, onOpen, onPlay }: SearchPage
                         onClick={() => onOpen(result.video)}
                       >
                         查看详情
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-secondary"
+                        onClick={() => sendSearchFeedback(result.video.id)}
+                      >
+                        {feedbackByResult[result.video.id] ?? '不相关'}
                       </button>
                       <button
                         type="button"

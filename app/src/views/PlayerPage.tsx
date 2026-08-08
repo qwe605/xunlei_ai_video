@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import Plyr from 'plyr'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { submitFeedback } from '../api/feedback'
 import { askPersistedVideo } from '../api/questions'
 import type { Video, VideoQa } from '../data/schema'
 import { answerVideoQuestion } from '../lib/search'
@@ -85,6 +86,7 @@ export function PlayerPage({ video, startSeconds, onBack, onProgress }: PlayerPa
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<VideoQa | null | 'no-evidence'>(null)
   const [asking, setAsking] = useState(false)
+  const [feedbackStatus, setFeedbackStatus] = useState<string | null>(null)
   const [transcript, setTranscript] = useState<TranscriptCue[]>([])
 
   useEffect(() => {
@@ -241,6 +243,7 @@ export function PlayerPage({ video, startSeconds, onBack, onProgress }: PlayerPa
     setActiveTab('ask')
     setAsking(true)
     setAnswer(null)
+    setFeedbackStatus(null)
     void askPersistedVideo(video.id, nextQuestion)
       .then((backendAnswer) => {
         setAnswer(backendAnswer ?? answerVideoQuestion(video, nextQuestion) ?? 'no-evidence')
@@ -249,6 +252,20 @@ export function PlayerPage({ video, startSeconds, onBack, onProgress }: PlayerPa
         setAnswer(answerVideoQuestion(video, nextQuestion) ?? 'no-evidence')
       })
       .finally(() => setAsking(false))
+  }
+
+  const sendAnswerFeedback = (feedbackType: 'helpful' | 'not_relevant') => {
+    if (!answer || answer === 'no-evidence') return
+    setFeedbackStatus('正在保存反馈')
+    void submitFeedback({
+      videoId: video.id,
+      targetType: 'video_answer',
+      targetId: answer.id,
+      feedbackType,
+      content: question,
+    })
+      .then(() => setFeedbackStatus('反馈已保存'))
+      .catch(() => setFeedbackStatus('反馈暂未保存'))
   }
 
   return (
@@ -443,11 +460,21 @@ export function PlayerPage({ video, startSeconds, onBack, onProgress }: PlayerPa
                     </button>
                   ))}
                   <div className="answer-feedback">
-                    <span>这个回答有帮助吗？</span>
-                    <button type="button" aria-label="有帮助" title="有帮助">
+                    <span>{feedbackStatus ?? '这个回答有帮助吗？'}</span>
+                    <button
+                      type="button"
+                      aria-label="有帮助"
+                      title="有帮助"
+                      onClick={() => sendAnswerFeedback('helpful')}
+                    >
                       <ThumbsUp size={15} />
                     </button>
-                    <button type="button" aria-label="不相关" title="不相关">
+                    <button
+                      type="button"
+                      aria-label="不相关"
+                      title="不相关"
+                      onClick={() => sendAnswerFeedback('not_relevant')}
+                    >
                       <ThumbsDown size={15} />
                     </button>
                   </div>
