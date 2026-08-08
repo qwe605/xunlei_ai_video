@@ -3,6 +3,7 @@ from fastapi import Request
 from app.config import Settings, get_settings
 from app.services.analysis_jobs import AnalysisService
 from app.services.library import LibraryService
+from app.services.search import SearchService
 
 
 def get_app_settings() -> Settings:
@@ -16,4 +17,8 @@ def get_analysis_service(request: Request) -> AnalysisService:
 
 def get_library_service(request: Request) -> LibraryService:
     return request.app.state.library_service
+
+
+def get_search_service(request: Request) -> SearchService:
+    return request.app.state.search_service
 """FastAPI 依赖注入入口，Controller 不自行构造全局服务。"""

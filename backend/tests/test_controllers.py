@@ -10,6 +10,9 @@ from app.schemas import (
     AnalysisJob,
     JobStatus,
     ProgressUpdateResponse,
+    SearchRequest,
+    SearchResponse,
+    SearchResultItem,
     UserProgressRead,
     SubtitleRead,
     VideoAssetRead,
@@ -143,14 +146,38 @@ class FakeLibraryService:
         return VideoDeleteResponse(video_id="video-api", deleted_assets=2)
 
 
+class FakeSearchService:
+    def __init__(self) -> None:
+        self.payload: SearchRequest | None = None
+
+    def search(self, payload: SearchRequest) -> SearchResponse:
+        self.payload = payload
+        return SearchResponse(
+            query=payload.query,
+            mode=payload.mode,
+            total=1,
+            results=[
+                SearchResultItem(
+                    video_id="video-api",
+                    score=9.5,
+                    confidence_label="高",
+                    match_reasons=["标题、摘要或文件信息与描述相关"],
+                    citations=[],
+                )
+            ],
+        )
+
+
 class ControllerTests(unittest.TestCase):
     def setUp(self) -> None:
         application = FastAPI()
         application.include_router(api_router)
         self.service = FakeAnalysisService()
         self.library_service = FakeLibraryService()
+        self.search_service = FakeSearchService()
         application.state.analysis_service = self.service
         application.state.library_service = self.library_service
+        application.state.search_service = self.search_service
         self.client = TestClient(application)
 
     def tearDown(self) -> None:
@@ -248,6 +275,16 @@ class ControllerTests(unittest.TestCase):
         deleted = self.client.delete("/api/v1/videos/video-api")
         self.assertEqual(deleted.status_code, 200)
         self.assertEqual(deleted.json()["deletedAssets"], 2)
+
+    def test_search_endpoint_returns_ranked_results(self) -> None:
+        response = self.client.post(
+            "/api/v1/search",
+            json={"query": "找讲字幕的视频", "mode": "hybrid", "limit": 5},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"][0]["videoId"], "video-api")
+        self.assertEqual(self.search_service.payload.limit, 5)  # type: ignore[union-attr]
 
 
 if __name__ == "__main__":

@@ -4,8 +4,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database.base import Base
-from app.database.repositories import AnalysisJobRepository, VideoRepository
-from app.schemas import AnalysisJob, AnalysisResult, ChapterResult, JobStatus
+from app.database.repositories import AnalysisJobRepository, SearchRepository, VideoRepository
+from app.schemas import AnalysisJob, AnalysisResult, ChapterResult, JobStatus, SearchRequest
+from app.services.search import SearchService
 
 
 class AnalysisJobRepositoryTests(unittest.TestCase):
@@ -142,6 +143,115 @@ class AnalysisJobRepositoryTests(unittest.TestCase):
             paths = repository.delete_video("video-delete", "demo-local")
             self.assertEqual(paths, ["video-delete/source.mp4", "video-delete/poster.jpg"])
             self.assertEqual(repository.list_by_owner("demo-local"), [])
+
+    def test_search_repository_returns_orm_corpus_for_owner(self) -> None:
+        with self.session_factory.begin() as session:
+            repository = VideoRepository(session)
+            repository.create_placeholder(
+                video_id="video-search",
+                owner_id="demo-local",
+                title="永夜生存实录",
+                original_filename="survival.mp4",
+                duration_seconds=90,
+            )
+            repository.apply_analysis_result(
+                video_id="video-search",
+                owner_id="demo-local",
+                result=AnalysisResult(
+                    language="中文（简体）",
+                    confidence=0.94,
+                    short_description="讲解避难所建设和夜间巡逻。",
+                    summary="主角在永夜环境中规划避难所，并安排巡逻路线。",
+                    tags=["永夜", "避难所"],
+                    subtitles_vtt=(
+                        "WEBVTT\n\n"
+                        "1\n00:00:10.000 --> 00:00:13.000\n我们先加固避难所入口\n\n"
+                        "2\n00:00:40.000 --> 00:00:44.000\n夜间巡逻要避开主路\n"
+                    ),
+                    asr_model="faster-whisper:large-v3",
+                    chapters=[
+                        ChapterResult(
+                            id="chapter-search",
+                            title="避难所规划",
+                            start_seconds=8,
+                            end_seconds=35,
+                            summary="说明入口加固和物资摆放。",
+                            source="subtitle",
+                            confidence=0.92,
+                            spoiler_level="none",
+                        )
+                    ],
+                ),
+            )
+            corpus = SearchRepository(session).list_searchable_videos("demo-local")
+
+        self.assertEqual(len(corpus), 1)
+        self.assertEqual(corpus[0].record.title, "永夜生存实录")
+        self.assertEqual(len(corpus[0].record.transcript_segments), 2)
+
+
+class SearchServiceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite+pysqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
+        self.patch_scope = unittest.mock.patch("app.services.search.session_scope", self._session_scope)
+        self.patch_scope.start()
+
+    def tearDown(self) -> None:
+        self.patch_scope.stop()
+        self.engine.dispose()
+
+    def _session_scope(self):
+        return self.session_factory.begin()
+
+    def test_search_service_returns_cited_subtitle_match(self) -> None:
+        with self.session_factory.begin() as session:
+            repository = VideoRepository(session)
+            repository.create_placeholder(
+                video_id="video-rag-search",
+                owner_id="demo-local",
+                title="中文教程",
+                original_filename="course.mp4",
+                duration_seconds=80,
+            )
+            repository.apply_analysis_result(
+                video_id="video-rag-search",
+                owner_id="demo-local",
+                result=AnalysisResult(
+                    language="中文（简体）",
+                    confidence=0.95,
+                    short_description="讲解 Python 保留字。",
+                    summary="课程解释保留字为什么不能作为变量名。",
+                    tags=["Python", "保留字"],
+                    subtitles_vtt=(
+                        "WEBVTT\n\n"
+                        "1\n00:00:12.000 --> 00:00:16.000\n这些保留字不能作为变量名\n"
+                    ),
+                    asr_model="faster-whisper:large-v3",
+                    chapters=[
+                        ChapterResult(
+                            id="chapter-python",
+                            title="保留字说明",
+                            start_seconds=10,
+                            end_seconds=30,
+                            summary="解释保留字和变量名限制。",
+                            source="subtitle",
+                            confidence=0.9,
+                            spoiler_level="none",
+                        )
+                    ],
+                ),
+            )
+
+        response = SearchService().search(
+            SearchRequest(query="找讲 Python 保留字的视频", mode="hybrid")
+        )
+
+        self.assertEqual(response.total, 1)
+        self.assertEqual(response.results[0].video_id, "video-rag-search")
+        self.assertGreaterEqual(len(response.results[0].citations), 1)
+        self.assertEqual(response.results[0].citations[0].source_type, "chapter")
 
 
 if __name__ == "__main__":

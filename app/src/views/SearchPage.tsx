@@ -1,5 +1,6 @@
 import { ArrowLeft, CirclePlay, FileText, Play, Search, Sparkles } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { searchPersistedVideos } from '../api/search'
 import { EmptyState } from '../components/EmptyState'
 import { StatusBadge } from '../components/StatusBadge'
 import { VideoThumbnail } from '../components/VideoThumbnail'
@@ -17,7 +18,37 @@ interface SearchPageProps {
 
 export function SearchPage({ query, videos, onBack, onOpen, onPlay }: SearchPageProps) {
   const [mode, setMode] = useState<SearchMode>('ai')
-  const results = useMemo(() => searchLibrary(query, mode, videos), [mode, query, videos])
+  const [backendResults, setBackendResults] = useState<ReturnType<typeof searchLibrary> | null>(null)
+  const [searching, setSearching] = useState(false)
+  const localResults = useMemo(() => searchLibrary(query, mode, videos), [mode, query, videos])
+  const results = backendResults && backendResults.length > 0 ? backendResults : localResults
+
+  useEffect(() => {
+    const trimmedQuery = query.trim()
+    if (!trimmedQuery) {
+      setBackendResults([])
+      return
+    }
+
+    let active = true
+    setSearching(true)
+    setBackendResults(null)
+    // 后端搜索覆盖已持久化的视频字幕、章节和摘要；接口不可用时用本地规则兜底，避免打断演示。
+    void searchPersistedVideos(trimmedQuery, mode, videos)
+      .then((nextResults) => {
+        if (active) setBackendResults(nextResults)
+      })
+      .catch(() => {
+        if (active) setBackendResults([])
+      })
+      .finally(() => {
+        if (active) setSearching(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [mode, query, videos])
 
   return (
     <main className="page search-page" id="main-content">
@@ -31,9 +62,11 @@ export function SearchPage({ query, videos, onBack, onOpen, onPlay }: SearchPage
           <p className="eyebrow">搜索结果</p>
           <h1>“{query}”</h1>
           <p>
-            {mode === 'ai'
-              ? `AI 综合文件信息与视频内容，找到 ${results.length} 个相关结果`
-              : `按原文件名与展示名称找到 ${results.length} 个结果`}
+            {searching
+              ? '正在检索服务端片库、字幕和章节'
+              : mode === 'ai'
+                ? `综合文件信息、字幕片段与章节，找到 ${results.length} 个相关结果`
+                : `按原文件名与展示名称找到 ${results.length} 个结果`}
           </p>
         </div>
         <div className="search-mode-control" role="tablist" aria-label="搜索模式">

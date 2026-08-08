@@ -163,3 +163,35 @@ class ProgressUpdateResponse(ApiModel):
 class VideoDeleteResponse(ApiModel):
     video_id: str
     deleted_assets: int = Field(ge=0)
+
+
+class SearchRequest(ApiModel):
+    query: str = Field(min_length=1, max_length=120)
+    mode: str = Field(default="hybrid", pattern="^(filename|hybrid)$")
+    owner_id: str = Field(default="demo-local", min_length=1, max_length=120)
+    limit: int = Field(default=8, ge=1, le=20)
+
+
+class SearchCitation(ApiModel):
+    id: str
+    video_id: str
+    start_seconds: float = Field(ge=0)
+    end_seconds: float = Field(gt=0)
+    text: str = Field(min_length=1, max_length=500)
+    source_type: str = Field(pattern="^(filename|metadata|subtitle|summary|chapter)$")
+    confidence: float = Field(ge=0, le=1)
+
+
+class SearchResultItem(ApiModel):
+    video_id: str
+    score: float = Field(ge=0)
+    confidence_label: str = Field(pattern="^(高|中|低)$")
+    match_reasons: list[str] = Field(default_factory=list, max_length=5)
+    citations: list[SearchCitation] = Field(default_factory=list, max_length=3)
+
+
+class SearchResponse(ApiModel):
+    query: str
+    mode: str
+    total: int = Field(ge=0)
+    results: list[SearchResultItem] = Field(default_factory=list)
