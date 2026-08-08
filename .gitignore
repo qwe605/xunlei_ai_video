@@ -21,6 +21,7 @@ __pycache__/
 backend/.venv/
 backend/data/
 backend/models/
+backend/*.db
 tools/vendor/
 .DS_Store
 Thumbs.db
