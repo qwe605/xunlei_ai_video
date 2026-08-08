@@ -77,11 +77,21 @@ const parseVtt = (content: string): TranscriptCue[] =>
 export function PlayerPage({ video, startSeconds, onBack, onProgress }: PlayerPageProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerRef = useRef<Plyr | null>(null)
+  const onProgressRef = useRef(onProgress)
+  const lastSavedProgress = useRef(Math.floor(startSeconds))
   const [currentTime, setCurrentTime] = useState(startSeconds)
   const [activeTab, setActiveTab] = useState<'chapters' | 'transcript' | 'ask'>('chapters')
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<VideoQa | null | 'no-evidence'>(null)
   const [transcript, setTranscript] = useState<TranscriptCue[]>([])
+
+  useEffect(() => {
+    onProgressRef.current = onProgress
+  }, [onProgress])
+
+  useEffect(() => {
+    lastSavedProgress.current = Math.floor(startSeconds)
+  }, [startSeconds, video.id])
 
   useEffect(() => {
     let cancelled = false
@@ -147,12 +157,31 @@ export function PlayerPage({ video, startSeconds, onBack, onProgress }: PlayerPa
       setCurrentTime(target)
       initialSeekApplied = true
     }
-    const updateTime = () => setCurrentTime(player.currentTime)
+    const persistProgress = (value: number) => {
+      const next = Math.floor(value)
+      if (!Number.isFinite(next) || Math.abs(next - lastSavedProgress.current) < 5) return
+      if (next < 2) return
+      // 深链或继续播放初始化时，浏览器可能先短暂汇报 0 秒；不能用这个瞬时值覆盖已有进度。
+      if (startSeconds > 1 && next < startSeconds) return
+      lastSavedProgress.current = next
+      onProgressRef.current(next)
+    }
+    const updateTime = () => {
+      const next = player.currentTime
+      setCurrentTime(next)
+      persistProgress(next)
+    }
+    const persistCurrentTime = () => persistProgress(element.currentTime)
 
     player.on('ready', seekWhenReady)
     player.on('timeupdate', updateTime)
+    player.on('pause', persistCurrentTime)
+    player.on('ended', persistCurrentTime)
     element.addEventListener('loadedmetadata', seekWhenReady)
     element.addEventListener('canplay', seekWhenReady)
+    element.addEventListener('timeupdate', persistCurrentTime)
+    element.addEventListener('pause', persistCurrentTime)
+    element.addEventListener('ended', persistCurrentTime)
     if (element.readyState >= HTMLMediaElement.HAVE_METADATA) {
       seekWhenReady()
     }
@@ -160,33 +189,18 @@ export function PlayerPage({ video, startSeconds, onBack, onProgress }: PlayerPa
     return () => {
       player.off('ready', seekWhenReady)
       player.off('timeupdate', updateTime)
+      player.off('pause', persistCurrentTime)
+      player.off('ended', persistCurrentTime)
+      persistCurrentTime()
       element.removeEventListener('loadedmetadata', seekWhenReady)
       element.removeEventListener('canplay', seekWhenReady)
+      element.removeEventListener('timeupdate', persistCurrentTime)
+      element.removeEventListener('pause', persistCurrentTime)
+      element.removeEventListener('ended', persistCurrentTime)
       player.destroy()
       playerRef.current = null
     }
   }, [startSeconds, video.durationSeconds, video.id])
-
-  useEffect(() => {
-    const element = videoRef.current
-    if (!element) return
-    let lastSaved = Math.floor(startSeconds)
-    const persistProgress = () => {
-      const next = Math.floor(element.currentTime)
-      if (!Number.isFinite(next) || Math.abs(next - lastSaved) < 5) return
-      lastSaved = next
-      onProgress(next)
-    }
-    element.addEventListener('timeupdate', persistProgress)
-    element.addEventListener('pause', persistProgress)
-    element.addEventListener('ended', persistProgress)
-    return () => {
-      persistProgress()
-      element.removeEventListener('timeupdate', persistProgress)
-      element.removeEventListener('pause', persistProgress)
-      element.removeEventListener('ended', persistProgress)
-    }
-  }, [onProgress, startSeconds, video.id])
 
   const currentChapter = useMemo(
     () =>
