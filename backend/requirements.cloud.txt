@@ -1,5 +1,7 @@
 fastapi==0.115.0
 httpx==0.28.1
+numpy>=2.3,<3
+opencc-python-reimplemented>=0.1.7,<0.2
 pillow==11.3.0
 python-multipart==0.0.20
 SQLAlchemy==2.0.41
