@@ -112,6 +112,8 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
   const [loading, setLoading] = useState(false)
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('fast')
   const [preciseModelReady, setPreciseModelReady] = useState<boolean | null>(null)
+  const [apiAsrReady, setApiAsrReady] = useState(false)
+  const [preciseNotice, setPreciseNotice] = useState('')
   const [error, setError] = useState('')
   const [magnet, setMagnet] = useState('')
   const [magnetLaunching, setMagnetLaunching] = useState(false)
@@ -125,10 +127,16 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
     let active = true
     void readAnalysisCapabilities()
       .then((capabilities) => {
-        if (active) setPreciseModelReady(capabilities.preciseModelReady)
+        if (active) {
+          setPreciseModelReady(capabilities.preciseModelReady)
+          setApiAsrReady(capabilities.apiAsrReady)
+        }
       })
       .catch(() => {
-        if (active) setPreciseModelReady(false)
+        if (active) {
+          setPreciseModelReady(false)
+          setApiAsrReady(false)
+        }
       })
     return () => {
       active = false
@@ -166,6 +174,10 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
 
   const confirmLocalImport = () => {
     if (!media) return
+    if (analysisMode === 'precise' && preciseModelReady !== true) {
+      setPreciseNotice('当前腾讯云演示服务器配置较小，暂不支持本地 Whisper large-v3 精准识别。可体验快速识别或 ASR API 识别；如需本地精准识别，请使用安装包版本。')
+      return
+    }
     const title = media.file.name.replace(/\.[^.]+$/, '') || media.file.name
     const imported = videoSchema.parse({
       id: `local-${crypto.randomUUID()}`,
@@ -321,7 +333,10 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
                   role="radio"
                   aria-checked={analysisMode === 'fast'}
                   className={analysisMode === 'fast' ? 'active' : ''}
-                  onClick={() => setAnalysisMode('fast')}
+                  onClick={() => {
+                    setPreciseNotice('')
+                    setAnalysisMode('fast')
+                  }}
                 >
                   <Gauge size={17} aria-hidden="true" />
                   <span><strong>快速</strong><small>Paraformer-zh</small></span>
@@ -329,22 +344,54 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
                 <button
                   type="button"
                   role="radio"
+                  aria-checked={analysisMode === 'api'}
+                  className={analysisMode === 'api' ? 'active' : ''}
+                  onClick={() => {
+                    setPreciseNotice('')
+                    setAnalysisMode('api')
+                  }}
+                >
+                  <Target size={17} aria-hidden="true" />
+                  <span><strong>ASR API</strong><small>豆包识别 2.0</small></span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
                   aria-checked={analysisMode === 'precise'}
                   className={analysisMode === 'precise' ? 'active' : ''}
-                  onClick={() => setAnalysisMode('precise')}
-                  disabled={preciseModelReady !== true}
+                  onClick={() => {
+                    if (preciseModelReady !== true) {
+                      setPreciseNotice('当前腾讯云演示服务器配置较小，暂不支持本地 Whisper large-v3 精准识别。可体验快速识别或 ASR API 识别；如需本地精准识别，请使用安装包版本。')
+                      return
+                    }
+                    setPreciseNotice('')
+                    setAnalysisMode('precise')
+                  }}
                 >
                   <Target size={17} aria-hidden="true" />
                   <span><strong>精准</strong><small>Whisper large-v3</small></span>
                 </button>
               </div>
-              <p>
+              <p hidden={analysisMode === 'api'}>
                 {analysisMode === 'fast'
                   ? preciseModelReady === false
                     ? '精准模型尚未安装完成，当前仅开放快速模式。'
                     : '适合日常整理，优先缩短等待时间。'
                   : '适合口音、专名或嘈杂音轨；CPU 环境处理 9 分钟视频约需 17 分钟。'}
               </p>
+              {analysisMode === 'api' && (
+                <p>
+                  {apiAsrReady
+                    ? '适合云端演示和高质量识别，按音频时长调用火山引擎 ASR API。'
+                    : 'ASR API 需要服务端配置火山引擎密钥和公网访问地址，部署后即可启用。'}
+                </p>
+              )}
+              {preciseNotice && (
+                <p className="import-error" role="alert">
+                  <AlertCircle size={16} />
+                  {preciseNotice}
+                </p>
+              )}
             </fieldset>
             <div className="analysis-privacy-note">
               <AlertCircle size={16} />

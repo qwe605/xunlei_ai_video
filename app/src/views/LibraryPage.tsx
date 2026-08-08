@@ -147,7 +147,7 @@ export function LibraryPage({
           <Sparkles size={18} aria-hidden="true" />
           <span>
             <strong>{benefitMetrics.readyCount} 个</strong>
-            <small>精准整理权益</small>
+            <small>高质量识别额度</small>
           </span>
         </div>
       </section>

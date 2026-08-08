@@ -30,7 +30,12 @@ export const createQueuedJob = (video: Video, analysisMode: AnalysisMode = 'fast
   status: 'queued',
   stage: '等待整理',
   progress: 0,
-  detail: analysisMode === 'fast' ? '已进入快速队列，即将读取音轨。' : '已进入精准队列，将使用更大的语音模型。',
+  detail:
+    analysisMode === 'fast'
+      ? '已进入快速队列，即将读取音轨。'
+      : analysisMode === 'api'
+        ? '已进入 ASR API 队列，将调用云端识别后生成字幕。'
+        : '已进入精准队列，将使用更大的语音模型。',
   analysisMode,
 })
 

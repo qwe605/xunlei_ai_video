@@ -453,6 +453,7 @@ test('精准模型未安装时不允许提交精准任务', async ({ page }) => 
         version: '2.0.0',
         preciseModel: 'faster-whisper:large-v3',
         preciseModelReady: false,
+        apiAsrReady: true,
       }),
     })
   })
@@ -460,8 +461,11 @@ test('精准模型未安装时不允许提交精准任务', async ({ page }) => 
   await openLibraryAsLoggedInUser(page, '/', 'precise-disabled')
   await page.getByRole('button', { name: '导入视频' }).click()
 
-  await expect(page.getByRole('radio', { name: /精准/ })).toBeDisabled()
-  await expect(page.getByText('精准模型尚未安装完成，当前仅开放快速模式。')).toBeVisible()
+  await expect(page.getByRole('radio', { name: /精准/ })).toBeEnabled()
+  await page.getByRole('radio', { name: /精准/ }).click()
+  await expect(page.getByText(/当前腾讯云演示服务器配置较小/)).toBeVisible()
+  await page.getByRole('radio', { name: /ASR API/ }).click()
+  await expect(page.getByText(/按音频时长调用火山引擎 ASR API/)).toBeVisible()
 })
 
 test('侧栏只保留可用筛选，磁力入口不伪造下载成功', async ({ page }) => {

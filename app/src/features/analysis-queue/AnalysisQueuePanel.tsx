@@ -55,7 +55,13 @@ export function AnalysisQueuePanel({ jobs, onRetry, onDismiss }: AnalysisQueuePr
                 <div className="analysis-job-title">
                   <strong>{job.title}</strong>
                   <div className="analysis-job-state">
-                    <span>{job.analysisMode === 'precise' ? '精准' : '快速'}</span>
+                    <span>
+                      {job.analysisMode === 'api'
+                        ? 'ASR API'
+                        : job.analysisMode === 'precise'
+                          ? '精准'
+                          : '快速'}
+                    </span>
                     <span>{statusLabel[job.status]}</span>
                   </div>
                 </div>
