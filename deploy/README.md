@@ -30,7 +30,8 @@ XUNLEI_PUBLIC_BASE_URL=http://公网IP:18080
 
 `Dockerfile.backend.cloud` 只安装 FastAPI、SQLite、PyAV、MiniMax 与火山 ASR API 所需依赖，不安装
 `torch`、`FunASR`、`faster-whisper` 和 `stable-ts`。这样公网 Demo 可以稳定使用 ASR API 识别；本地
-Whisper large-v3 精准模式仍保留给安装包或高配私有部署。
+Whisper large-v3 精准模式仍保留给安装包或高配私有部署。镜像构建时直接使用基础镜像内置 pip，
+避免公网服务器因为额外下载 pip 或系统包而长时间阻塞。
 
 ## 数据与模型
 
