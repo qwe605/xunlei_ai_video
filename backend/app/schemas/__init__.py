@@ -22,6 +22,7 @@ class JobStatus(StrEnum):
 
 class AnalysisMode(StrEnum):
     fast = "fast"
+    api = "api"
     precise = "precise"
 
 
@@ -66,6 +67,7 @@ class HealthResponse(ApiModel):
     version: str
     precise_model: str
     precise_model_ready: bool
+    api_asr_ready: bool = False
 
 
 class MagnetOpenRequest(ApiModel):

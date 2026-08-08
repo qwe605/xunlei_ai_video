@@ -268,6 +268,18 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         self.assertEqual(self.service.create_arguments["analysis_mode"], "precise")
 
+        api_response = self.client.post(
+            "/api/v1/analyses",
+            data={
+                "video_id": "video-api",
+                "duration_seconds": "12",
+                "analysis_mode": "api",
+            },
+            files={"video": ("demo.mp4", b"media", "video/mp4")},
+        )
+        self.assertEqual(api_response.status_code, 202)
+        self.assertEqual(self.service.create_arguments["analysis_mode"], "api")
+
         invalid = self.client.post(
             "/api/v1/analyses",
             data={

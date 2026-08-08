@@ -34,6 +34,14 @@ class Settings:
     minimax_base_url: str
     preload_asr: bool
     media_root: Path = field(default_factory=lambda: BACKEND_ROOT / "data" / "media")
+    public_base_url: str = ""
+    volc_asr_api_key: str = ""
+    volc_asr_app_id: str = ""
+    volc_asr_access_token: str = ""
+    volc_asr_resource_id: str = "volc.seedasr.auc"
+    volc_asr_base_url: str = "https://openspeech.bytedance.com/api/v3/auc/bigmodel"
+    volc_asr_poll_interval_seconds: float = 2.0
+    volc_asr_timeout_seconds: float = 600.0
 
 
 @lru_cache(maxsize=1)
@@ -55,6 +63,19 @@ def get_settings() -> Settings:
         ).rstrip("/"),
         preload_asr=os.getenv("XUNLEI_PRELOAD_ASR", "true").lower()
         in {"1", "true", "yes"},
+        public_base_url=os.getenv("XUNLEI_PUBLIC_BASE_URL", "").rstrip("/"),
+        volc_asr_api_key=os.getenv("VOLC_ASR_API_KEY", ""),
+        volc_asr_app_id=os.getenv("VOLC_ASR_APP_ID", ""),
+        volc_asr_access_token=os.getenv("VOLC_ASR_ACCESS_TOKEN", ""),
+        volc_asr_resource_id=os.getenv("VOLC_ASR_RESOURCE_ID", "volc.seedasr.auc"),
+        volc_asr_base_url=os.getenv(
+            "VOLC_ASR_BASE_URL",
+            "https://openspeech.bytedance.com/api/v3/auc/bigmodel",
+        ).rstrip("/"),
+        volc_asr_poll_interval_seconds=float(
+            os.getenv("VOLC_ASR_POLL_INTERVAL_SECONDS", "2")
+        ),
+        volc_asr_timeout_seconds=float(os.getenv("VOLC_ASR_TIMEOUT_SECONDS", "600")),
     )
 
 

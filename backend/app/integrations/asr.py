@@ -1,13 +1,18 @@
 import os
 import re
 import tempfile
+import time
+import uuid
 import wave
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import quote, urlparse
 
+import httpx
 import numpy as np
 
+from app.config import get_settings
 from app.services.content_analysis import TranscriptSegment, TranscriptWord
 from app.services.text_normalization import to_simplified_chinese
 
@@ -61,6 +66,10 @@ class TranscriptionInfo:
     language: str
     language_probability: float
     model_label: str
+
+
+class VolcAsrError(RuntimeError):
+    """火山 ASR 调用失败；外层服务会转成用户可理解的任务失败原因。"""
 
 
 def _clean_text(value: str) -> str:
@@ -133,6 +142,66 @@ def parse_funasr_result(payload: Any, duration_seconds: float) -> list[Transcrip
     start = float(timestamps[0][0]) / 1000 if timestamps else 0.0
     end = float(timestamps[-1][1]) / 1000 if timestamps else duration_seconds
     return [TranscriptSegment(start=max(0, start), end=min(duration_seconds, end), text=text)]
+
+
+def parse_volc_asr_result(payload: Any, duration_seconds: float) -> list[TranscriptSegment]:
+    if not isinstance(payload, dict):
+        raise ValueError("火山 ASR 未返回有效转写结果")
+    result = payload.get("result") or {}
+    if not isinstance(result, dict):
+        raise ValueError("火山 ASR 结果结构不符合预期")
+
+    utterances = result.get("utterances") or []
+    segments: list[TranscriptSegment] = []
+    for utterance in utterances:
+        if not isinstance(utterance, dict):
+            continue
+        text = _clean_text(str(utterance.get("text", "")))
+        if not text:
+            continue
+        start = max(0.0, float(utterance.get("start_time", 0)) / 1000)
+        end = min(duration_seconds, float(utterance.get("end_time", 0)) / 1000)
+        if end <= start:
+            continue
+        words = tuple(
+            TranscriptWord(
+                start=max(0.0, float(word.get("start_time", 0)) / 1000),
+                end=min(duration_seconds, float(word.get("end_time", 0)) / 1000),
+                text=_clean_text(str(word.get("text", ""))),
+                probability=1.0,
+            )
+            for word in (utterance.get("words") or [])
+            if isinstance(word, dict) and _clean_text(str(word.get("text", "")))
+        )
+        segments.append(
+            TranscriptSegment(
+                start=start,
+                end=end,
+                text=text,
+                avg_logprob=0.0,
+                no_speech_prob=0.0,
+                compression_ratio=1.0,
+                min_word_probability=0.96,
+                low_confidence_word_ratio=0.0,
+                words=words,
+            )
+        )
+
+    if segments:
+        return segments
+
+    text = _clean_text(str(result.get("text", "")))
+    if not text:
+        raise ValueError("没有识别到语音内容")
+    audio_info = payload.get("audio_info") if isinstance(payload.get("audio_info"), dict) else {}
+    audio_duration = float(audio_info.get("duration", duration_seconds * 1000)) / 1000
+    return [
+        TranscriptSegment(
+            start=0.0,
+            end=min(duration_seconds, max(0.1, audio_duration)),
+            text=text,
+        )
+    ]
 
 
 def effective_content_duration(
@@ -361,7 +430,147 @@ class FasterWhisperTranscriber:
         )
 
 
+class VolcAsrTranscriber:
+    def __init__(self) -> None:
+        settings = get_settings()
+        self._progress_callback: Callable[[float], None] | None = None
+        self.api_key = settings.volc_asr_api_key
+        self.app_id = settings.volc_asr_app_id
+        self.access_token = settings.volc_asr_access_token
+        self.resource_id = settings.volc_asr_resource_id
+        self.base_url = settings.volc_asr_base_url
+        self.public_base_url = settings.public_base_url
+        self.poll_interval_seconds = max(0.5, settings.volc_asr_poll_interval_seconds)
+        self.timeout_seconds = max(30.0, settings.volc_asr_timeout_seconds)
+        self._validate_configuration()
+
+    def set_progress_callback(
+        self,
+        callback: Callable[[float], None] | None,
+    ) -> None:
+        """注册轮询进度；云端接口只返回队列/处理中/完成三类状态。"""
+        self._progress_callback = callback
+
+    def _validate_configuration(self) -> None:
+        if not self.api_key and not (self.app_id and self.access_token):
+            raise VolcAsrError("ASR API 尚未配置密钥，请在服务端环境变量中配置火山引擎凭证。")
+        parsed = urlparse(self.public_base_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise VolcAsrError("ASR API 需要配置公网可访问的 XUNLEI_PUBLIC_BASE_URL。")
+        if parsed.hostname in {"localhost", "127.0.0.1", "::1"}:
+            raise VolcAsrError("ASR API 不能使用本机回环地址，请部署后填写公网域名或公网 IP。")
+
+    def _headers(self, task_id: str, sequence: str | None = None) -> dict[str, str]:
+        headers = {
+            "X-Api-Resource-Id": self.resource_id,
+            "X-Api-Request-Id": task_id,
+            "Content-Type": "application/json",
+        }
+        if sequence is not None:
+            headers["X-Api-Sequence"] = sequence
+        if self.api_key:
+            headers["X-Api-Key"] = self.api_key
+        else:
+            headers["X-Api-App-Key"] = self.app_id
+            headers["X-Api-Access-Key"] = self.access_token
+        return headers
+
+    def _ensure_public_audio(self, source_path: Path) -> tuple[Path, str]:
+        video_id = source_path.parent.name
+        if not re.fullmatch(r"[A-Za-z0-9._-]+", video_id):
+            raise VolcAsrError("视频标识不符合公开音频地址规则，无法提交 ASR API。")
+        audio_path = source_path.parent / "asr-api.wav"
+        temp_path = extract_audio_wav(source_path)
+        try:
+            Path(temp_path).replace(audio_path)
+        except Exception:
+            Path(temp_path).unlink(missing_ok=True)
+            raise
+        return (
+            audio_path,
+            f"{self.public_base_url}/api/v1/analyses/media/{quote(video_id)}/asr-audio",
+        )
+
+    def _check_status(self, response: httpx.Response) -> str:
+        status_code = response.headers.get("X-Api-Status-Code", "")
+        message = response.headers.get("X-Api-Message", "")
+        if response.status_code >= 400:
+            raise VolcAsrError("ASR API 请求失败，请检查火山引擎服务状态和网络。")
+        if status_code and status_code not in {"20000000", "20000001", "20000002"}:
+            if status_code == "20000003":
+                raise ValueError("没有识别到语音内容")
+            raise VolcAsrError(f"ASR API 返回错误：{status_code} {message}".strip())
+        return status_code
+
+    def transcribe(
+        self,
+        source_path: Path,
+        duration_seconds: float,
+    ) -> tuple[list[TranscriptSegment], TranscriptionInfo]:
+        task_id = uuid.uuid4().hex
+        audio_path, audio_url = self._ensure_public_audio(source_path)
+        try:
+            if self._progress_callback:
+                self._progress_callback(0.08)
+            with httpx.Client(timeout=30.0) as client:
+                submit_payload = {
+                    "user": {"uid": "xunlei-ai-video-demo"},
+                    "audio": {
+                        "format": "wav",
+                        "url": audio_url,
+                        "language": "zh-CN",
+                        "rate": 16000,
+                        "bits": 16,
+                        "channel": 1,
+                    },
+                    "request": {
+                        "model_name": "bigmodel",
+                        "enable_itn": True,
+                        "enable_punc": False,
+                        "show_utterances": True,
+                    },
+                }
+                submit = client.post(
+                    f"{self.base_url}/submit",
+                    headers=self._headers(task_id, "-1"),
+                    json=submit_payload,
+                )
+                self._check_status(submit)
+                if self._progress_callback:
+                    self._progress_callback(0.18)
+
+                started = time.monotonic()
+                while True:
+                    if time.monotonic() - started > self.timeout_seconds:
+                        raise VolcAsrError("ASR API 识别超时，请稍后重试或改用快速识别。")
+                    time.sleep(self.poll_interval_seconds)
+                    query = client.post(
+                        f"{self.base_url}/query",
+                        headers=self._headers(task_id),
+                        json={},
+                    )
+                    status_code = self._check_status(query)
+                    if status_code == "20000000":
+                        if self._progress_callback:
+                            self._progress_callback(0.86)
+                        return (
+                            parse_volc_asr_result(query.json(), duration_seconds),
+                            TranscriptionInfo(
+                                language="中文（简体）",
+                                language_probability=0.98,
+                                model_label=f"火山引擎豆包录音文件识别 2.0 · {self.resource_id}",
+                            ),
+                        )
+                    if self._progress_callback:
+                        elapsed = time.monotonic() - started
+                        self._progress_callback(min(0.82, 0.2 + elapsed / self.timeout_seconds * 0.6))
+        finally:
+            audio_path.unlink(missing_ok=True)
+
+
 def create_transcriber(mode: str = "fast"):
+    if mode == "api":
+        return VolcAsrTranscriber()
     if mode == "precise":
         if not precise_model_ready():
             raise FileNotFoundError(

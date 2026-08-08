@@ -10,6 +10,7 @@ from app.integrations.asr import (
     create_transcriber,
     effective_content_duration,
     parse_funasr_result,
+    parse_volc_asr_result,
     FasterWhisperTranscriber,
 )
 from app.services.content_analysis import TranscriptSegment
@@ -57,6 +58,33 @@ class ChineseAsrTests(unittest.TestCase):
 
         self.assertEqual([word.text for word in segments[0].words], ["第", "一", "二"])
         self.assertEqual(segments[0].words[2].start, 3.0)
+
+    def test_parses_volc_asr_utterances_and_words(self) -> None:
+        segments = parse_volc_asr_result(
+            {
+                "audio_info": {"duration": 2400},
+                "result": {
+                    "text": "这是迅雷 AI 片库",
+                    "utterances": [
+                        {
+                            "start_time": 0,
+                            "end_time": 2400,
+                            "text": "这是迅雷 AI 片库",
+                            "words": [
+                                {"start_time": 0, "end_time": 300, "text": "这"},
+                                {"start_time": 300, "end_time": 620, "text": "是"},
+                            ],
+                        }
+                    ],
+                },
+            },
+            duration_seconds=3,
+        )
+
+        self.assertEqual(len(segments), 1)
+        self.assertEqual((segments[0].start, segments[0].end), (0.0, 2.4))
+        self.assertEqual(segments[0].text, "这是迅雷 AI 片库")
+        self.assertEqual([word.text for word in segments[0].words], ["这", "是"])
 
     @patch("app.integrations.asr.precise_model_ready", return_value=True)
     @patch("app.integrations.asr.FasterWhisperTranscriber")

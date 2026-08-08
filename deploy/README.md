@@ -8,7 +8,7 @@
 ```powershell
 cd E:\xunlei
 copy backend\.env.example .env
-# 在 .env 中填入 MINIMAX_API_KEY，不要提交 .env
+# 在 .env 中填入 MINIMAX_API_KEY、XUNLEI_PUBLIC_BASE_URL 和火山 ASR 凭证，不要提交 .env
 docker compose up --build
 ```
 
@@ -22,6 +22,11 @@ docker compose up --build
 - `xunlei-data`：保存 SQLite 数据库和上传媒体。
 - `xunlei-models`：保存 Hugging Face、ModelScope 和 faster-whisper 模型缓存。
 - `MINIMAX_API_KEY`、`MINIMAX_MODEL`、`MINIMAX_BASE_URL` 均从环境变量注入。
+- `VOLC_ASR_API_KEY` 或 `VOLC_ASR_APP_ID` + `VOLC_ASR_ACCESS_TOKEN` 用于火山引擎 ASR API；`XUNLEI_PUBLIC_BASE_URL` 必须填写评委可访问的公网域名或公网 IP，否则云端 ASR 无法拉取临时音频。
+
+## 腾讯云演示限制
+
+当前腾讯云小规格服务器默认不加载本地 Whisper large-v3 精准模式。线上演示提供快速识别和 ASR API 识别；本地精准识别保留给安装包版本，避免 large-v3 权重和 CPU 推理时间拖垮公网 Demo。
 
 ## 仍需上线前补齐
 

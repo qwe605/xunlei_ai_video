@@ -17,6 +17,7 @@ from app.integrations.asr import (
     ASR_ENGINE,
     ASR_MODEL,
     PRECISE_ASR_MODEL,
+    VolcAsrError,
     create_transcriber,
     effective_content_duration,
     precise_model_ready,
@@ -84,6 +85,7 @@ class AnalysisService:
         # 两种模式独立加锁，避免快速模型预热阻塞用户主动提交的精准任务。
         self._model_locks = {
             "fast": threading.Lock(),
+            "api": threading.Lock(),
             "precise": threading.Lock(),
         }
         self._recover_interrupted_jobs()
@@ -198,9 +200,13 @@ class AnalysisService:
         duration_seconds: float,
         analysis_mode: str = "fast",
     ) -> AnalysisJob:
-        if analysis_mode not in {"fast", "precise"}:
+        if analysis_mode not in {"fast", "api", "precise"}:
             raise UploadValidationError(422, "不支持的分析模式")
-        mode_label = "快速模式" if analysis_mode == "fast" else "精准模式"
+        mode_label = {
+            "fast": "快速模式",
+            "api": "ASR API 模式",
+            "precise": "本地精准模式",
+        }[analysis_mode]
         job = AnalysisJob(
             id=uuid.uuid4().hex,
             video_id=video_id,
@@ -265,6 +271,9 @@ class AnalysisService:
                     if model_cached
                     else "首次运行需要把 FunASR 中文模型载入内存；之后同一服务进程会复用模型。"
                 )
+            elif analysis_mode == "api":
+                model_stage = "准备 ASR API 识别"
+                model_detail = "正在检查火山引擎 ASR API 配置，并准备把音轨提交到云端识别。"
             else:
                 model_stage = "准备精准识别" if model_cached else "加载本地精准语音模型"
                 model_detail = (
@@ -288,6 +297,9 @@ class AnalysisService:
                 raise MediaAnalysisError(
                     "ASR_MODEL_LOAD_FAILED",
                     (
+                        "ASR API 配置不可用，请检查火山引擎密钥和公网访问地址。"
+                        if analysis_mode == "api"
+                        else
                         "本地精准语音模型加载失败，请检查模型文件和运行环境，"
                         "或先切换快速模式。"
                         if analysis_mode == "precise"
@@ -297,15 +309,21 @@ class AnalysisService:
             model_name = (
                 MODEL_NAME
                 if analysis_mode == "fast"
+                else "volcengine:seedasr-2.0"
+                if analysis_mode == "api"
                 else f"faster-whisper:{PRECISE_ASR_MODEL}"
             )
             self._update(
                 job_id,
-                stage="识别语音",
+                stage="提交 ASR API" if analysis_mode == "api" else "识别语音",
                 progress=25,
                 detail=(
-                    f"{model_name} 正在从真实音轨生成带词级时间轴字幕；"
-                    "进度按已识别的音频时间更新。"
+                    "正在把临时音频提交到火山引擎录音文件识别 2.0，完成后会继续生成字幕、摘要和章节。"
+                    if analysis_mode == "api"
+                    else (
+                        f"{model_name} 正在从真实音轨生成带词级时间轴字幕；"
+                        "进度按已识别的音频时间更新。"
+                    )
                 ),
             )
             last_progress = 24
@@ -322,8 +340,12 @@ class AnalysisService:
                     job_id,
                     progress=progress,
                     detail=(
-                        f"已识别 {_format_media_time(processed)} / "
-                        f"{_format_media_time(duration_seconds)}，正在生成词级时间轴字幕。"
+                        "ASR API 正在排队或识别；完成后会自动进入 MiniMax-M3 整理。"
+                        if analysis_mode == "api"
+                        else (
+                            f"已识别 {_format_media_time(processed)} / "
+                            f"{_format_media_time(duration_seconds)}，正在生成词级时间轴字幕。"
+                        )
                     ),
                 )
 
@@ -399,6 +421,15 @@ class AnalysisService:
                 progress=0,
                 detail=error.user_message,
                 error_code=error.code,
+            )
+        except VolcAsrError as error:
+            self._update(
+                job_id,
+                status=JobStatus.failed,
+                stage="ASR API 识别失败",
+                progress=0,
+                detail=str(error),
+                error_code="ASR_API_FAILED",
             )
         except ValueError as error:
             no_speech = "没有识别到语音" in str(error)

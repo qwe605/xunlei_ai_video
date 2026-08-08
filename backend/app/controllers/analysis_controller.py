@@ -1,8 +1,13 @@
+import re
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 
+from app.config import Settings
 from app.dependencies import get_analysis_service
+from app.dependencies import get_app_settings
 from app.schemas import AnalysisJob, AnalysisMode
 from app.services.analysis_jobs import AnalysisService, UploadValidationError
 
@@ -51,4 +56,22 @@ def get_analysis(
     if job is None:
         raise HTTPException(status_code=404, detail="分析任务不存在或已过期")
     return job
+
+
+@router.get("/media/{video_id}/asr-audio")
+def get_analysis_audio_for_asr(
+    video_id: str,
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> FileResponse:
+    # 仅暴露后端为 ASR API 生成的临时 WAV，避免把任意本地路径变成公开下载入口。
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", video_id):
+        raise HTTPException(status_code=404, detail="音频不存在")
+    audio_path = settings.media_root / video_id / "asr-api.wav"
+    try:
+        audio_path.relative_to(settings.media_root)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail="音频不存在") from error
+    if not audio_path.is_file():
+        raise HTTPException(status_code=404, detail="音频不存在")
+    return FileResponse(Path(audio_path), media_type="audio/wav", filename="asr-api.wav")
 """视频分析 HTTP 接口：校验请求、映射状态码并调用业务 Service。"""

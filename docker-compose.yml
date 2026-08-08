@@ -11,6 +11,14 @@ services:
       MINIMAX_MODEL: ${MINIMAX_MODEL:-MiniMax-M3}
       MINIMAX_BASE_URL: ${MINIMAX_BASE_URL:-https://api.minimaxi.com}
       XUNLEI_PRELOAD_ASR: ${XUNLEI_PRELOAD_ASR:-false}
+      XUNLEI_PUBLIC_BASE_URL: ${XUNLEI_PUBLIC_BASE_URL:-}
+      VOLC_ASR_API_KEY: ${VOLC_ASR_API_KEY:-}
+      VOLC_ASR_APP_ID: ${VOLC_ASR_APP_ID:-}
+      VOLC_ASR_ACCESS_TOKEN: ${VOLC_ASR_ACCESS_TOKEN:-}
+      VOLC_ASR_RESOURCE_ID: ${VOLC_ASR_RESOURCE_ID:-volc.seedasr.auc}
+      VOLC_ASR_BASE_URL: ${VOLC_ASR_BASE_URL:-https://openspeech.bytedance.com/api/v3/auc/bigmodel}
+      VOLC_ASR_POLL_INTERVAL_SECONDS: ${VOLC_ASR_POLL_INTERVAL_SECONDS:-2}
+      VOLC_ASR_TIMEOUT_SECONDS: ${VOLC_ASR_TIMEOUT_SECONDS:-600}
       XUNLEI_PRECISE_MODEL_PATH: /models/faster-whisper-large-v3
       HF_HOME: /models/huggingface
       MODELSCOPE_CACHE: /models/modelscope
