@@ -1,0 +1,45 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      DATABASE_URL: sqlite:////data/xunlei.db
+      XUNLEI_MEDIA_ROOT: /data/media
+      XUNLEI_MAX_UPLOAD_BYTES: ${XUNLEI_MAX_UPLOAD_BYTES:-314572800}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+      MINIMAX_MODEL: ${MINIMAX_MODEL:-MiniMax-M3}
+      MINIMAX_BASE_URL: ${MINIMAX_BASE_URL:-https://api.minimaxi.com}
+      XUNLEI_PRELOAD_ASR: ${XUNLEI_PRELOAD_ASR:-false}
+      XUNLEI_PRECISE_MODEL_PATH: /models/faster-whisper-large-v3
+      HF_HOME: /models/huggingface
+      MODELSCOPE_CACHE: /models/modelscope
+    volumes:
+      - xunlei-data:/data
+      - xunlei-models:/models
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${XUNLEI_WEB_PORT:-8080}:80"
+
+volumes:
+  xunlei-data:
+  xunlei-models:

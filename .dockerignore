@@ -1,0 +1,16 @@
+app/node_modules
+app/dist
+app/playwright-report
+app/test-results
+backend/.venv
+backend/data
+backend/models
+output
+tmp
+references
+**/__pycache__
+**/.pytest_cache
+.git
+.env
+.env.*
+!backend/.env.example
