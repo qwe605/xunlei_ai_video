@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { demoSessionStorageKey, type DemoSession } from './accountSession'
+import { derivePasswordHash } from './passwordHash'
 
 interface StoredAccount extends DemoSession {
   salt: string
@@ -29,22 +30,6 @@ const bytesToBase64 = (bytes: Uint8Array) => {
     binary += String.fromCharCode(byte)
   })
   return btoa(binary)
-}
-
-const derivePasswordHash = async (password: string, salt: Uint8Array) => {
-  const material = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits'],
-  )
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: new Uint8Array(salt), iterations: 120_000, hash: 'SHA-256' },
-    material,
-    256,
-  )
-  return bytesToBase64(new Uint8Array(bits))
 }
 
 const base64ToBytes = (value: string) =>
@@ -93,6 +78,8 @@ export function AccountDialog({
       localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account))
       localStorage.setItem(demoSessionStorageKey, JSON.stringify(nextSession))
       onSessionChange(nextSession)
+    } catch {
+      setError('注册失败，请稍后重试')
     } finally {
       setSubmitting(false)
     }
@@ -117,6 +104,8 @@ export function AccountDialog({
       const nextSession = { displayName: account.displayName, email: account.email }
       localStorage.setItem(demoSessionStorageKey, JSON.stringify(nextSession))
       onSessionChange(nextSession)
+    } catch {
+      setError('登录失败，本地账号数据可能已损坏，请重新注册')
     } finally {
       setSubmitting(false)
     }
