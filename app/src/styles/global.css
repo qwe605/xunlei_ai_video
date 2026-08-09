@@ -732,6 +732,36 @@ p {
   gap: 16px;
 }
 
+.video-grid.list-view {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.video-grid.list-view .video-card {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+}
+
+.video-grid.list-view .thumbnail-button,
+.video-grid.list-view .video-thumbnail {
+  height: 100%;
+}
+
+.video-grid.list-view .video-thumbnail {
+  min-height: 180px;
+  aspect-ratio: auto;
+}
+
+.video-grid.list-view .video-card-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.video-grid.list-view .video-card-actions {
+  margin-top: auto;
+  padding-top: 14px;
+}
+
 .video-card {
   min-width: 0;
   overflow: hidden;
@@ -2474,6 +2504,15 @@ p {
 
   .video-grid {
     grid-template-columns: 1fr;
+  }
+
+  .video-grid.list-view .video-card {
+    display: block;
+  }
+
+  .video-grid.list-view .video-thumbnail {
+    min-height: 0;
+    aspect-ratio: 16 / 9;
   }
 
   .header-import {

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { Video } from '../data/schema'
+import { buildPromptSuggestions } from '../lib/promptSuggestions'
 import { VideoCard } from '../components/VideoCard'
 import { AnalysisQueuePanel } from '../features/analysis-queue/AnalysisQueuePanel'
 import type { AnalysisJob } from '../features/analysis-queue/analysisQueue'
@@ -28,12 +29,6 @@ interface LibraryPageProps {
   onRetryAnalysis: (videoId: string) => void
   onDismissAnalysis: (videoId: string) => void
 }
-
-const promptSuggestions = [
-  '找讲 Python 名字由来的视频',
-  '找演示 Python 交互式解释器的片段',
-  '找讲保留字和变量的课程',
-]
 
 const filterLabels: Record<LibraryFilter, string> = {
   all: '全部视频',
@@ -54,6 +49,8 @@ export function LibraryPage({
   onDismissAnalysis,
 }: LibraryPageProps) {
   const [sort, setSort] = useState<'saved' | 'name' | 'progress'>('saved')
+  const [viewMode, setViewMode] = useState<'poster' | 'list'>('poster')
+  const promptSuggestions = useMemo(() => buildPromptSuggestions(videos), [videos])
   const benefitMetrics = useMemo(() => {
     const readyVideos = videos.filter((video) => video.indexStatus === 'ready')
     const subtitleSeconds = readyVideos.reduce((total, video) => total + video.durationSeconds, 0)
@@ -92,10 +89,24 @@ export function LibraryPage({
           <p>共 {videos.length} 个视频，AI 已完成 {videos.filter((video) => video.indexStatus === 'ready').length} 个</p>
         </div>
         <div className="page-heading-actions">
-          <button type="button" className="icon-button active" title="海报视图" aria-label="切换到海报视图">
+          <button
+            type="button"
+            className={`icon-button ${viewMode === 'poster' ? 'active' : ''}`}
+            title="海报视图"
+            aria-label="切换到海报视图"
+            aria-pressed={viewMode === 'poster'}
+            onClick={() => setViewMode('poster')}
+          >
             <Grid2X2 size={18} />
           </button>
-          <button type="button" className="icon-button" title="列表视图" aria-label="切换到列表视图">
+          <button
+            type="button"
+            className={`icon-button ${viewMode === 'list' ? 'active' : ''}`}
+            title="列表视图"
+            aria-label="切换到列表视图"
+            aria-pressed={viewMode === 'list'}
+            onClick={() => setViewMode('list')}
+          >
             <List size={18} />
           </button>
         </div>
@@ -190,7 +201,7 @@ export function LibraryPage({
         </div>
       </section>
 
-      <section className="video-grid" aria-label="视频列表">
+      <section className={`video-grid ${viewMode === 'list' ? 'list-view' : ''}`} aria-label="视频列表">
         {visibleVideos.length > 0 ? (
           visibleVideos.map((video) => (
             <VideoCard video={video} onOpen={onOpen} onPlay={onPlay} key={video.id} />
