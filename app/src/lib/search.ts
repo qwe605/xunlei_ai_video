@@ -20,7 +20,7 @@ const normalize = (value: string) =>
 const queryTerms = (query: string) => {
   const withoutFillers = query
     .toLocaleLowerCase('zh-CN')
-    .replace(/找我保存的|找|讲|那个|这部|视频|的/g, ' ')
+    .replace(/找我保存的|找|讲|关于|那个|这部|视频|的/g, ' ')
 
   return withoutFillers
     .split(/[\s，。、“”‘’：；！？，./_\-[\]()]+/)
