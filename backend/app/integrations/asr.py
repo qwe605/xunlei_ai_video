@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import tempfile
 import time
 import uuid
@@ -499,7 +500,8 @@ class VolcAsrTranscriber:
         audio_path = source_path.parent / "asr-api.wav"
         temp_path = extract_audio_wav(source_path)
         try:
-            Path(temp_path).replace(audio_path)
+            # /tmp 与 Docker 数据卷可能分属不同文件系统，move 会在 EXDEV 时回退为复制后删除。
+            shutil.move(str(temp_path), audio_path)
         except Exception:
             Path(temp_path).unlink(missing_ok=True)
             raise

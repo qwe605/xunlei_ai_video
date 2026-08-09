@@ -1,3 +1,5 @@
+import errno
+import tempfile
 import unittest
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -12,12 +14,52 @@ from app.integrations.asr import (
     parse_funasr_result,
     parse_volc_asr_result,
     FasterWhisperTranscriber,
+    VolcAsrTranscriber,
 )
 from app.services.content_analysis import TranscriptSegment
 from app.services.text_normalization import simplify_data, to_simplified_chinese
 
 
 class ChineseAsrTests(unittest.TestCase):
+    def test_api_audio_move_supports_cross_device_temp_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            root = Path(temp_root)
+            source_dir = root / "video-api"
+            source_dir.mkdir()
+            source_path = source_dir / "source.mp4"
+            source_path.write_bytes(b"video")
+            extracted_audio = root / "temporary.wav"
+            extracted_audio.write_bytes(b"wave")
+            settings = SimpleNamespace(
+                volc_asr_api_key="api-key",
+                volc_asr_app_id="",
+                volc_asr_access_token="",
+                volc_asr_resource_id="volc.seedasr.auc",
+                volc_asr_base_url="https://openspeech.bytedance.com/api/v3/auc/bigmodel",
+                public_base_url="https://example.com",
+                volc_asr_poll_interval_seconds=2,
+                volc_asr_timeout_seconds=600,
+            )
+
+            with patch("app.integrations.asr.get_settings", return_value=settings), patch(
+                "app.integrations.asr.extract_audio_wav",
+                return_value=extracted_audio,
+            ), patch.object(
+                Path,
+                "replace",
+                side_effect=OSError(errno.EXDEV, "Invalid cross-device link"),
+            ):
+                audio_path, audio_url = VolcAsrTranscriber()._ensure_public_audio(
+                    source_path
+                )
+
+            self.assertEqual(audio_path.read_bytes(), b"wave")
+            self.assertFalse(extracted_audio.exists())
+            self.assertEqual(
+                audio_url,
+                "https://example.com/api/v1/analyses/media/video-api/asr-audio",
+            )
+
     def test_parses_funasr_sentence_timestamps(self) -> None:
         segments = parse_funasr_result(
             [
