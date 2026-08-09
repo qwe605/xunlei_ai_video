@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: ${XUNLEI_BACKEND_DOCKERFILE:-Dockerfile.backend}
+      args:
+        PIP_INDEX_URL: ${XUNLEI_PIP_INDEX_URL:-https://pypi.org/simple}
     environment:
       DATABASE_URL: sqlite:////data/xunlei.db
       XUNLEI_MEDIA_ROOT: /data/media

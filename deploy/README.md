@@ -25,6 +25,7 @@ docker compose up --build
 XUNLEI_BACKEND_DOCKERFILE=Dockerfile.backend.cloud
 XUNLEI_WEB_PORT=18080
 XUNLEI_PRELOAD_ASR=false
+XUNLEI_PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple
 XUNLEI_PUBLIC_BASE_URL=http://公网IP:18080
 ```
 
