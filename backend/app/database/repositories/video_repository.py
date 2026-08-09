@@ -23,6 +23,7 @@ from app.schemas import (
     UserProgressRead,
     VideoDetail,
     VideoListItem,
+    VideoCorrectionUpdate,
 )
 
 
@@ -95,6 +96,27 @@ class VideoRepository:
     def get_detail(self, video_id: str, owner_id: str = "demo-local") -> VideoDetail | None:
         record = self._load_video(video_id, owner_id)
         return self._to_detail(record, owner_id) if record else None
+
+    def update_information(
+        self,
+        video_id: str,
+        owner_id: str,
+        payload: VideoCorrectionUpdate,
+    ) -> VideoDetail | None:
+        record = self._load_video(video_id, owner_id)
+        if record is None:
+            return None
+        record.title = payload.title.strip()
+        record.short_description = payload.short_description.strip()
+        record.summary = payload.summary.strip()
+        unique_tags = list(dict.fromkeys(tag.strip() for tag in payload.tags if tag.strip()))
+        record.tags.clear()
+        record.tags.extend(
+            VideoTagRecord(id=_new_id(), video_id=video_id, name=tag)
+            for tag in unique_tags
+        )
+        self._session.flush()
+        return self._to_detail(record, owner_id)
 
     def create_placeholder(
         self,

@@ -101,6 +101,29 @@ export async function readPersistedVideo(videoId: string): Promise<Video> {
   return toClientVideo(videoDetailSchema.parse(await response.json()))
 }
 
+export interface VideoInformationUpdate {
+  title: string
+  shortDescription: string
+  summary: string
+  tags: string[]
+}
+
+export async function updateVideoInformation(
+  videoId: string,
+  payload: VideoInformationUpdate,
+): Promise<Video> {
+  const response = await fetch(`/api/v1/videos/${encodeURIComponent(videoId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { detail?: string } | null
+    throw new Error(body?.detail ?? '纠正信息保存失败')
+  }
+  return toClientVideo(videoDetailSchema.parse(await response.json()))
+}
+
 export async function saveWatchProgress(video: Video, positionSeconds: number): Promise<void> {
   await fetch(`/api/v1/videos/${encodeURIComponent(video.id)}/progress`, {
     method: 'PATCH',

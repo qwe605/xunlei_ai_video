@@ -16,18 +16,22 @@ import { StatusBadge } from '../components/StatusBadge'
 import { VideoThumbnail } from '../components/VideoThumbnail'
 import type { Video } from '../data/schema'
 import { formatDuration } from '../lib/time'
+import { VideoCorrectionDialog } from '../features/video-correction/VideoCorrectionDialog'
+import type { VideoInformationUpdate } from '../api/videos'
 
 interface VideoDetailPageProps {
   video: Video
   onBack: () => void
   onPlay: (video: Video, startSeconds?: number) => void
   onDelete: (video: Video) => Promise<void>
+  onCorrect: (video: Video, payload: VideoInformationUpdate) => Promise<void>
 }
 
-export function VideoDetailPage({ video, onBack, onPlay, onDelete }: VideoDetailPageProps) {
+export function VideoDetailPage({ video, onBack, onPlay, onDelete, onCorrect }: VideoDetailPageProps) {
   const [spoilersVisible, setSpoilersVisible] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [correctionOpen, setCorrectionOpen] = useState(false)
   const progress = Math.round((video.watchProgressSeconds / video.durationSeconds) * 100)
   const deleteVideo = async () => {
     if (!window.confirm(`确定从片库删除《${video.title}》吗？`)) return
@@ -104,10 +108,12 @@ export function VideoDetailPage({ video, onBack, onPlay, onDelete }: VideoDetail
               <Play size={18} fill="currentColor" aria-hidden="true" />
               {video.watchProgressSeconds > 0 ? '继续播放' : '开始播放'}
             </button>
-            <button type="button" className="button button-secondary">
-              <Edit3 size={17} aria-hidden="true" />
-              纠正信息
-            </button>
+            {video.importSource === 'local' && (
+              <button type="button" className="button button-secondary" onClick={() => setCorrectionOpen(true)}>
+                <Edit3 size={17} aria-hidden="true" />
+                纠正信息
+              </button>
+            )}
             {video.importSource === 'local' && (
               <button
                 type="button"
@@ -228,6 +234,13 @@ export function VideoDetailPage({ video, onBack, onPlay, onDelete }: VideoDetail
           <span>{video.duplicateHint}</span>
           <button type="button">查看版本</button>
         </aside>
+      )}
+      {correctionOpen && (
+        <VideoCorrectionDialog
+          video={video}
+          onClose={() => setCorrectionOpen(false)}
+          onSave={(payload) => onCorrect(video, payload)}
+        />
       )}
     </main>
   )

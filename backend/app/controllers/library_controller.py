@@ -10,6 +10,7 @@ from app.schemas import (
     VideoDeleteResponse,
     VideoDetail,
     VideoListItem,
+    VideoCorrectionUpdate,
 )
 from app.services.library import LibraryService
 
@@ -35,6 +36,23 @@ def get_video(
     if video is None:
         raise HTTPException(status_code=404, detail="视频不存在或无权访问")
     return video
+
+
+@router.patch("/{video_id}", response_model=VideoDetail)
+def correct_video_information(
+    video_id: str,
+    payload: VideoCorrectionUpdate,
+    service: Annotated[LibraryService, Depends(get_library_service)],
+    owner_id: str = "demo-local",
+) -> VideoDetail:
+    try:
+        return service.correct_video_information(
+            video_id=video_id,
+            owner_id=owner_id,
+            payload=payload,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @router.patch("/{video_id}/progress", response_model=ProgressUpdateResponse)

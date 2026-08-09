@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from app.config import Settings, get_settings
-from app.database.repositories import VideoRepository
+from app.database.repositories import FeedbackRepository, VideoRepository
 from app.database.session import session_scope
 from app.schemas import (
     ProgressUpdateResponse,
@@ -10,6 +10,8 @@ from app.schemas import (
     VideoDeleteResponse,
     VideoDetail,
     VideoListItem,
+    VideoCorrectionUpdate,
+    FeedbackCreate,
 )
 
 
@@ -26,6 +28,29 @@ class LibraryService:
     def get_video(self, video_id: str, owner_id: str = "demo-local") -> VideoDetail | None:
         with session_scope() as session:
             return VideoRepository(session).get_detail(video_id, owner_id)
+
+    def correct_video_information(
+        self,
+        *,
+        video_id: str,
+        owner_id: str,
+        payload: VideoCorrectionUpdate,
+    ) -> VideoDetail:
+        with session_scope() as session:
+            video = VideoRepository(session).update_information(video_id, owner_id, payload)
+            if video is None:
+                raise LookupError("视频不存在或无权访问")
+            FeedbackRepository(session).create(
+                FeedbackCreate(
+                    user_id=owner_id,
+                    video_id=video_id,
+                    target_type="video_metadata",
+                    target_id=video_id,
+                    feedback_type="correction",
+                    content=f"用户纠正标题、简介、摘要和标签：{payload.title}"[:500],
+                )
+            )
+            return video
 
     def update_progress(
         self,

@@ -20,6 +20,7 @@ from app.schemas import (
     SubtitleRead,
     VideoAssetRead,
     VideoDeleteResponse,
+    VideoCorrectionUpdate,
     VideoDetail,
     VideoListItem,
     VideoQuestionRequest,
@@ -98,6 +99,19 @@ class FakeLibraryService:
         if video_id != "video-api":
             return None
         return VideoDetail.model_validate(self.list_videos(owner_id)[0].model_dump())
+
+    def correct_video_information(
+        self,
+        *,
+        video_id: str,
+        owner_id: str,
+        payload: VideoCorrectionUpdate,
+    ) -> VideoDetail:
+        if video_id != "video-api":
+            raise LookupError("视频不存在或无权访问")
+        original = self.list_videos(owner_id)[0].model_dump()
+        original.update(payload.model_dump())
+        return VideoDetail.model_validate(original)
 
     def update_progress(self, **arguments: object) -> ProgressUpdateResponse:
         if arguments["video_id"] != "video-api":
@@ -339,6 +353,21 @@ class ControllerTests(unittest.TestCase):
         deleted = self.client.delete("/api/v1/videos/video-api")
         self.assertEqual(deleted.status_code, 200)
         self.assertEqual(deleted.json()["deletedAssets"], 2)
+
+    def test_video_correction_endpoint_returns_updated_information(self) -> None:
+        response = self.client.patch(
+            "/api/v1/videos/video-api",
+            json={
+                "title": "纠正后的标题",
+                "shortDescription": "纠正后的简介。",
+                "summary": "纠正后的完整摘要。",
+                "tags": ["纠错", "反馈"],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["title"], "纠正后的标题")
+        self.assertEqual(response.json()["tags"], ["纠错", "反馈"])
 
     def test_search_endpoint_returns_ranked_results(self) -> None:
         response = self.client.post(

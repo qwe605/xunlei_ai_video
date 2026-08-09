@@ -17,6 +17,7 @@ from app.schemas import (
     FeedbackCreate,
     JobStatus,
     SearchRequest,
+    VideoCorrectionUpdate,
 )
 from app.schemas import VideoQuestionRequest
 from app.integrations.minimax import MinimaxSummaryError
@@ -158,6 +159,43 @@ class AnalysisJobRepositoryTests(unittest.TestCase):
             paths = repository.delete_video("video-delete", "demo-local")
             self.assertEqual(paths, ["video-delete/source.mp4", "video-delete/poster.jpg"])
             self.assertEqual(repository.list_by_owner("demo-local"), [])
+
+    def test_video_repository_corrects_information_for_owner_only(self) -> None:
+        with self.session_factory.begin() as session:
+            repository = VideoRepository(session)
+            repository.create_placeholder(
+                video_id="video-correction",
+                owner_id="owner-a",
+                title="旧标题",
+                original_filename="correction.mp4",
+                duration_seconds=30,
+            )
+            updated = repository.update_information(
+                "video-correction",
+                "owner-a",
+                VideoCorrectionUpdate(
+                    title="新标题",
+                    short_description="用户校正后的一句话简介。",
+                    summary="用户确认后的完整内容摘要。",
+                    tags=["校正", "中文", "校正"],
+                ),
+            )
+
+            self.assertIsNotNone(updated)
+            self.assertEqual(updated.title, "新标题")  # type: ignore[union-attr]
+            self.assertEqual(updated.tags, ["校正", "中文"])  # type: ignore[union-attr]
+            self.assertIsNone(
+                repository.update_information(
+                    "video-correction",
+                    "owner-b",
+                    VideoCorrectionUpdate(
+                        title="越权修改",
+                        short_description="不应保存的简介。",
+                        summary="不应保存的摘要。",
+                        tags=["越权"],
+                    ),
+                )
+            )
 
     def test_feedback_repository_creates_feedback_and_summary(self) -> None:
         with self.session_factory.begin() as session:

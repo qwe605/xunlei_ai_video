@@ -17,6 +17,8 @@ import {
   readPersistedVideo,
   readPersistedVideos,
   saveWatchProgress,
+  updateVideoInformation,
+  type VideoInformationUpdate,
 } from '../api/videos'
 import { ImportVideoDialog } from '../features/import-video/ImportVideoDialog'
 import { navigateTo, routes, useAppRoute } from '../router'
@@ -274,6 +276,10 @@ export function App() {
     setAnalysisJobs((current) => current.filter((job) => job.videoId !== targetVideo.id))
     navigateTo(routes.library())
   }, [])
+  const correctVideo = useCallback(async (targetVideo: Video, payload: VideoInformationUpdate) => {
+    const updated = await updateVideoInformation(targetVideo.id, payload)
+    setVideos((current) => current.map((video) => (video.id === targetVideo.id ? updated : video)))
+  }, [])
   const retryAnalysis = (videoId: string) => {
     setVideos((current) =>
       current.map((video) =>
@@ -379,6 +385,7 @@ export function App() {
             onBack={() => navigateTo(routes.library())}
             onPlay={playVideo}
             onDelete={deleteVideo}
+            onCorrect={correctVideo}
           />
         )}
       </div>

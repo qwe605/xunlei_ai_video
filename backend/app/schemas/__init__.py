@@ -152,6 +152,13 @@ class VideoDetail(VideoListItem):
     transcript_segments: list[TranscriptSegmentRead] = Field(default_factory=list)
 
 
+class VideoCorrectionUpdate(ApiModel):
+    title: str = Field(min_length=1, max_length=160)
+    short_description: str = Field(min_length=1, max_length=220)
+    summary: str = Field(min_length=1, max_length=1200)
+    tags: list[str] = Field(min_length=1, max_length=8)
+
+
 class ProgressUpdate(ApiModel):
     user_id: str = Field(default="demo-local", min_length=1, max_length=120)
     position_seconds: float = Field(ge=0)
@@ -218,7 +225,7 @@ class VideoQuestionResponse(ApiModel):
 class FeedbackCreate(ApiModel):
     user_id: str = Field(default="demo-local", min_length=1, max_length=120)
     video_id: str | None = Field(default=None, max_length=100)
-    target_type: str = Field(pattern="^(search_result|video_answer|chapter|subtitle)$")
+    target_type: str = Field(pattern="^(search_result|video_answer|chapter|subtitle|video_metadata)$")
     target_id: str = Field(min_length=1, max_length=160)
     feedback_type: str = Field(pattern="^(helpful|not_relevant|correction)$")
     content: str | None = Field(default=None, max_length=500)
