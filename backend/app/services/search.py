@@ -9,7 +9,7 @@ from app.schemas import SearchCitation, SearchRequest, SearchResponse, SearchRes
 
 
 _SPLIT_PATTERN = re.compile(r"[\s，。、“”‘’：；！？，./_\-[\]()（）]+")
-_FILLERS = re.compile(r"(找我保存的|找一下|找|讲|那个|这部|视频|片段|内容|一下)")
+_FILLERS = re.compile(r"(找我保存的|找一下|找|讲|关于|那个|这部|视频|片段|内容|一下)")
 
 
 @dataclass(frozen=True)
@@ -52,14 +52,14 @@ def _confidence_label(score: float) -> str:
 class SearchService:
     """自然语言搜索业务层；当前先做可解释混合检索，后续可在此接入 embedding 召回。"""
 
-    def search(self, payload: SearchRequest) -> SearchResponse:
+    def search(self, payload: SearchRequest, owner_id: str = "demo-local") -> SearchResponse:
         query = payload.query.strip()
         if not query:
             return SearchResponse(query=payload.query, mode=payload.mode, total=0, results=[])
 
         terms = _query_terms(query)
         with session_scope() as session:
-            corpus = SearchRepository(session).list_searchable_videos(payload.owner_id)
+            corpus = SearchRepository(session).list_searchable_videos(owner_id)
 
         scored = [
             self._score_filename(item, query, terms)

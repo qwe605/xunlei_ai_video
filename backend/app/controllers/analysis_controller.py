@@ -1,3 +1,4 @@
+import hmac
 import re
 from pathlib import Path
 from typing import Annotated
@@ -6,9 +7,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from fastapi.responses import FileResponse
 
 from app.config import Settings
-from app.dependencies import get_analysis_service
+from app.dependencies import get_analysis_service, get_current_user
 from app.dependencies import get_app_settings
-from app.schemas import AnalysisJob, AnalysisMode
+from app.integrations.asr import asr_audio_access_token
+from app.schemas import AnalysisJob, AnalysisMode, UserRead
 from app.services.analysis_jobs import AnalysisService, UploadValidationError
 
 
@@ -18,6 +20,7 @@ router = APIRouter(prefix="/analyses", tags=["视频分析"])
 @router.post("", response_model=AnalysisJob, status_code=status.HTTP_202_ACCEPTED)
 async def create_analysis(
     service: Annotated[AnalysisService, Depends(get_analysis_service)],
+    user: Annotated[UserRead, Depends(get_current_user)],
     video: UploadFile = File(),
     poster: UploadFile | None = File(default=None),
     video_id: str = Form(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._-]+$"),
@@ -37,6 +40,7 @@ async def create_analysis(
             video_id=video_id,
             duration_seconds=duration_seconds,
             analysis_mode=analysis_mode.value,
+            owner_id=user.id,
             title=title,
             resolution=resolution,
             codec=codec,
@@ -51,8 +55,9 @@ async def create_analysis(
 def get_analysis(
     job_id: str,
     service: Annotated[AnalysisService, Depends(get_analysis_service)],
+    user: Annotated[UserRead, Depends(get_current_user)],
 ) -> AnalysisJob:
-    job = service.get(job_id)
+    job = service.get(job_id, user.id)
     if job is None:
         raise HTTPException(status_code=404, detail="分析任务不存在或已过期")
     return job
@@ -62,9 +67,13 @@ def get_analysis(
 def get_analysis_audio_for_asr(
     video_id: str,
     settings: Annotated[Settings, Depends(get_app_settings)],
+    token: str = "",
 ) -> FileResponse:
     # 仅暴露后端为 ASR API 生成的临时 WAV，避免把任意本地路径变成公开下载入口。
     if not re.fullmatch(r"[A-Za-z0-9._-]+", video_id):
+        raise HTTPException(status_code=404, detail="音频不存在")
+    expected_token = asr_audio_access_token(video_id, settings)
+    if not expected_token or not hmac.compare_digest(token, expected_token):
         raise HTTPException(status_code=404, detail="音频不存在")
     audio_path = settings.media_root / video_id / "asr-api.wav"
     try:

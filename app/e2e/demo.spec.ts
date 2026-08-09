@@ -4,9 +4,10 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 async function registerDemoAccount(page: import('@playwright/test').Page, suffix = 'e2e') {
+  const uniqueSuffix = `${suffix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
   await page.getByRole('tab', { name: '注册' }).click()
   await page.getByLabel('昵称').fill(`评审账号${suffix}`)
-  await page.getByLabel('邮箱').fill(`judge-${suffix}@example.com`)
+  await page.getByLabel('邮箱').fill(`judge-${uniqueSuffix}@example.com`)
   await page.getByLabel('密码').fill('review-pass-2026')
   await page.getByRole('button', { name: '创建并登录' }).click()
   await expect(page.getByRole('heading', { name: '全部视频' })).toBeVisible()
@@ -28,7 +29,8 @@ test('从自然语言搜索到视频片段跳转形成完整闭环', async ({ pa
   await expect(page.getByRole('heading', { name: '全部视频' })).toBeVisible()
   await expect(page.getByRole('article')).toHaveCount(4)
 
-  await page.getByRole('button', { name: /找讲 Python 名字由来的视频/ }).click()
+  await page.getByRole('textbox', { name: '搜索整个视频片库' }).fill('找讲 Python 名字由来的视频')
+  await page.getByRole('button', { name: '开始搜索' }).click()
   await expect(page.getByRole('heading', { name: '“找讲 Python 名字由来的视频”' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Python 入门：语言、语法与保留字' })).toBeVisible()
   await expect(page.getByText(/相关章节位于 02:04/)).toBeVisible()
@@ -50,7 +52,11 @@ test('从自然语言搜索到视频片段跳转形成完整闭环', async ({ pa
   await expect
     .poll(() => page.getByTestId('demo-video').evaluate((element) => (element as HTMLVideoElement).currentTime))
     .toBeGreaterThanOrEqual(688)
-  expect(browserErrors.filter((message) => !message.includes('status of 404'))).toEqual([])
+  expect(
+    browserErrors.filter(
+      (message) => !message.includes('status of 404') && !message.includes('status of 401'),
+    ),
+  ).toEqual([])
 })
 
 test('无证据问题会明确拒答', async ({ page }) => {
@@ -513,27 +519,28 @@ test('默认进入登录页，深链未登录时不能绕过片库门禁', async
   await registerDemoAccount(page, 'gate')
 })
 
-test('我的片库支持本地注册登录、退出再登录，且不展示不可用的迅雷授权入口', async ({ page }) => {
+test('我的片库支持服务端注册登录、退出再登录，且不展示不可用的迅雷授权入口', async ({ page }) => {
+  const email = `judge-account-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`
   await page.goto('/')
   await expect(page.getByRole('heading', { name: '登录迅雷 AI 片库' })).toBeVisible()
   await page.getByRole('tab', { name: '注册' }).click()
   await page.getByLabel('昵称').fill('评审账号')
-  await page.getByLabel('邮箱').fill('judge@example.com')
+  await page.getByLabel('邮箱').fill(email)
   await page.getByLabel('密码').fill('review-pass-2026')
   await page.getByRole('button', { name: '创建并登录' }).click()
 
   await page.getByRole('button', { name: '打开账号中心' }).click()
-  await expect(page.getByText('Demo 本地账号')).toBeVisible()
+  await expect(page.getByText('服务端安全会话')).toBeVisible()
   await expect(page.getByText('迅雷开放平台 AppID')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '前往迅雷授权' })).toHaveCount(0)
 
   await page.getByRole('button', { name: '退出' }).click()
   await expect(page.getByRole('heading', { name: '登录迅雷 AI 片库' })).toBeVisible()
-  await page.getByLabel('邮箱').fill('judge@example.com')
+  await page.getByLabel('邮箱').fill(email)
   await page.getByLabel('密码').fill('review-pass-2026')
   await page.getByRole('button', { name: '登录', exact: true }).click()
   await page.getByRole('button', { name: '打开账号中心' }).click()
-  await expect(page.getByText('judge@example.com')).toBeVisible()
+  await expect(page.getByText(email)).toBeVisible()
 })
 
 test('首页没有严重可访问性问题', async ({ page }) => {

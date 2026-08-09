@@ -32,9 +32,10 @@ class QuestionService:
         *,
         video_id: str,
         payload: VideoQuestionRequest,
+        owner_id: str = "demo-local",
     ) -> VideoQuestionResponse:
         with session_scope() as session:
-            item = SearchRepository(session).get_searchable_video(video_id, payload.owner_id)
+            item = SearchRepository(session).get_searchable_video(video_id, owner_id)
         if item is None:
             raise LookupError("视频不存在或无权访问")
 

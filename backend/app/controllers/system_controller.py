@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 
+from app.dependencies import get_current_user
 from app.integrations.system_links import MagnetOpenError, open_magnet_in_system
-from app.schemas import MagnetOpenRequest, MagnetOpenResponse
+from app.schemas import MagnetOpenRequest, MagnetOpenResponse, UserRead
 
 
 router = APIRouter(prefix="/system", tags=["系统集成"])
@@ -12,6 +13,7 @@ router = APIRouter(prefix="/system", tags=["系统集成"])
 @router.post("/magnet", response_model=MagnetOpenResponse)
 def open_magnet(
     payload: Annotated[MagnetOpenRequest, Body()],
+    _user: Annotated[UserRead, Depends(get_current_user)],
 ) -> MagnetOpenResponse:
     try:
         open_magnet_in_system(payload.magnet)

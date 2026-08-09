@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 
-from app.dependencies import get_library_service
+from app.dependencies import get_current_user, get_library_service
 from app.schemas import (
     ProgressUpdate,
     ProgressUpdateResponse,
@@ -11,6 +11,7 @@ from app.schemas import (
     VideoDetail,
     VideoListItem,
     VideoCorrectionUpdate,
+    UserRead,
 )
 from app.services.library import LibraryService
 
@@ -21,18 +22,18 @@ router = APIRouter(prefix="/videos", tags=["片库"])
 @router.get("", response_model=list[VideoListItem])
 def list_videos(
     service: Annotated[LibraryService, Depends(get_library_service)],
-    owner_id: str = "demo-local",
+    user: Annotated[UserRead, Depends(get_current_user)],
 ) -> list[VideoListItem]:
-    return service.list_videos(owner_id=owner_id)
+    return service.list_videos(owner_id=user.id)
 
 
 @router.get("/{video_id}", response_model=VideoDetail)
 def get_video(
     video_id: str,
     service: Annotated[LibraryService, Depends(get_library_service)],
-    owner_id: str = "demo-local",
+    user: Annotated[UserRead, Depends(get_current_user)],
 ) -> VideoDetail:
-    video = service.get_video(video_id=video_id, owner_id=owner_id)
+    video = service.get_video(video_id=video_id, owner_id=user.id)
     if video is None:
         raise HTTPException(status_code=404, detail="视频不存在或无权访问")
     return video
@@ -43,12 +44,12 @@ def correct_video_information(
     video_id: str,
     payload: VideoCorrectionUpdate,
     service: Annotated[LibraryService, Depends(get_library_service)],
-    owner_id: str = "demo-local",
+    user: Annotated[UserRead, Depends(get_current_user)],
 ) -> VideoDetail:
     try:
         return service.correct_video_information(
             video_id=video_id,
-            owner_id=owner_id,
+            owner_id=user.id,
             payload=payload,
         )
     except LookupError as error:
@@ -60,11 +61,12 @@ def update_progress(
     video_id: str,
     payload: ProgressUpdate,
     service: Annotated[LibraryService, Depends(get_library_service)],
+    user: Annotated[UserRead, Depends(get_current_user)],
 ) -> ProgressUpdateResponse:
     try:
         return service.update_progress(
             video_id=video_id,
-            user_id=payload.user_id,
+            user_id=user.id,
             position_seconds=payload.position_seconds,
             duration_seconds=payload.duration_seconds,
         )
@@ -76,13 +78,13 @@ def update_progress(
 def get_video_media(
     video_id: str,
     service: Annotated[LibraryService, Depends(get_library_service)],
-    owner_id: str = "demo-local",
+    user: Annotated[UserRead, Depends(get_current_user)],
 ) -> FileResponse:
     try:
         resolved = service.get_asset_path(
             video_id=video_id,
             asset_type="source",
-            owner_id=owner_id,
+            owner_id=user.id,
         )
     except PermissionError as error:
         raise HTTPException(status_code=403, detail="无权访问该视频资产") from error
@@ -98,10 +100,10 @@ def get_video_media(
 def delete_video(
     video_id: str,
     service: Annotated[LibraryService, Depends(get_library_service)],
-    owner_id: str = "demo-local",
+    user: Annotated[UserRead, Depends(get_current_user)],
 ) -> VideoDeleteResponse:
     try:
-        return service.delete_video(video_id=video_id, owner_id=owner_id)
+        return service.delete_video(video_id=video_id, owner_id=user.id)
     except PermissionError as error:
         raise HTTPException(status_code=403, detail="无权删除该视频资产") from error
     except LookupError as error:
@@ -112,13 +114,13 @@ def delete_video(
 def get_video_poster(
     video_id: str,
     service: Annotated[LibraryService, Depends(get_library_service)],
-    owner_id: str = "demo-local",
+    user: Annotated[UserRead, Depends(get_current_user)],
 ) -> FileResponse:
     try:
         resolved = service.get_asset_path(
             video_id=video_id,
             asset_type="poster",
-            owner_id=owner_id,
+            owner_id=user.id,
         )
     except PermissionError as error:
         raise HTTPException(status_code=403, detail="无权访问该视频资产") from error
@@ -134,9 +136,9 @@ def get_video_poster(
 def get_active_subtitle(
     video_id: str,
     service: Annotated[LibraryService, Depends(get_library_service)],
-    owner_id: str = "demo-local",
+    user: Annotated[UserRead, Depends(get_current_user)],
 ) -> Response:
-    subtitle = service.get_active_subtitle(video_id=video_id, owner_id=owner_id)
+    subtitle = service.get_active_subtitle(video_id=video_id, owner_id=user.id)
     if subtitle is None:
         raise HTTPException(status_code=404, detail="字幕不存在或尚未生成")
     return Response(content=subtitle.vtt_text, media_type="text/vtt; charset=utf-8")

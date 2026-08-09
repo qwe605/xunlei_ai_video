@@ -33,6 +33,8 @@ class Settings:
     minimax_model: str
     minimax_base_url: str
     preload_asr: bool
+    auth_cookie_secure: bool = False
+    auth_session_days: int = 7
     media_root: Path = field(default_factory=lambda: BACKEND_ROOT / "data" / "media")
     public_base_url: str = ""
     volc_asr_api_key: str = ""
@@ -63,6 +65,9 @@ def get_settings() -> Settings:
         ).rstrip("/"),
         preload_asr=os.getenv("XUNLEI_PRELOAD_ASR", "true").lower()
         in {"1", "true", "yes"},
+        auth_cookie_secure=os.getenv("XUNLEI_AUTH_COOKIE_SECURE", "false").lower()
+        in {"1", "true", "yes"},
+        auth_session_days=max(1, int(os.getenv("XUNLEI_AUTH_SESSION_DAYS", "7"))),
         public_base_url=os.getenv("XUNLEI_PUBLIC_BASE_URL", "").rstrip("/"),
         volc_asr_api_key=os.getenv("VOLC_ASR_API_KEY", ""),
         volc_asr_app_id=os.getenv("VOLC_ASR_APP_ID", ""),

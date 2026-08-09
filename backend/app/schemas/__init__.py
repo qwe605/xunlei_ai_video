@@ -60,6 +60,21 @@ class AnalysisJob(ApiModel):
     error_code: str | None = None
 
 
+class AuthCredentials(ApiModel):
+    email: str = Field(min_length=5, max_length=254, pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+    password: str = Field(min_length=8, max_length=128)
+
+
+class RegisterRequest(AuthCredentials):
+    display_name: str = Field(min_length=2, max_length=40)
+
+
+class UserRead(ApiModel):
+    id: str
+    email: str
+    display_name: str
+
+
 class HealthResponse(ApiModel):
     status: str
     model: str
@@ -160,7 +175,6 @@ class VideoCorrectionUpdate(ApiModel):
 
 
 class ProgressUpdate(ApiModel):
-    user_id: str = Field(default="demo-local", min_length=1, max_length=120)
     position_seconds: float = Field(ge=0)
     duration_seconds: float = Field(gt=0, le=86_400)
 
@@ -178,7 +192,6 @@ class VideoDeleteResponse(ApiModel):
 class SearchRequest(ApiModel):
     query: str = Field(min_length=1, max_length=120)
     mode: str = Field(default="hybrid", pattern="^(filename|hybrid)$")
-    owner_id: str = Field(default="demo-local", min_length=1, max_length=120)
     limit: int = Field(default=8, ge=1, le=20)
 
 
@@ -209,7 +222,6 @@ class SearchResponse(ApiModel):
 
 class VideoQuestionRequest(ApiModel):
     question: str = Field(min_length=1, max_length=160)
-    owner_id: str = Field(default="demo-local", min_length=1, max_length=120)
     limit: int = Field(default=5, ge=1, le=8)
 
 
@@ -223,7 +235,15 @@ class VideoQuestionResponse(ApiModel):
 
 
 class FeedbackCreate(ApiModel):
-    user_id: str = Field(default="demo-local", min_length=1, max_length=120)
+    user_id: str = Field(min_length=1, max_length=120)
+    video_id: str | None = Field(default=None, max_length=100)
+    target_type: str = Field(pattern="^(search_result|video_answer|chapter|subtitle|video_metadata)$")
+    target_id: str = Field(min_length=1, max_length=160)
+    feedback_type: str = Field(pattern="^(helpful|not_relevant|correction)$")
+    content: str | None = Field(default=None, max_length=500)
+
+
+class FeedbackSubmission(ApiModel):
     video_id: str | None = Field(default=None, max_length=100)
     target_type: str = Field(pattern="^(search_result|video_answer|chapter|subtitle|video_metadata)$")
     target_id: str = Field(min_length=1, max_length=160)

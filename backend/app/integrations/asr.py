@@ -1,4 +1,6 @@
 import os
+import hashlib
+import hmac
 import re
 import shutil
 import tempfile
@@ -16,6 +18,19 @@ import numpy as np
 from app.config import Settings, get_settings
 from app.services.content_analysis import TranscriptSegment, TranscriptWord
 from app.services.text_normalization import to_simplified_chinese
+
+
+def asr_audio_access_token(video_id: str, settings: Settings) -> str:
+    """为第三方 ASR 回拉地址生成不可伪造的文件访问签名。"""
+
+    secret = settings.volc_asr_access_token or settings.volc_asr_api_key
+    if not secret:
+        return ""
+    return hmac.new(
+        secret.encode("utf-8"),
+        f"asr-audio:{video_id}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 # Windows 本地环境中 hf_xet 大文件分片可能长期无进度；默认使用可续传的普通 HTTP 下载。
@@ -507,7 +522,8 @@ class VolcAsrTranscriber:
             raise
         return (
             audio_path,
-            f"{self.public_base_url}/api/v1/analyses/media/{quote(video_id)}/asr-audio",
+            f"{self.public_base_url}/api/v1/analyses/media/{quote(video_id)}/asr-audio"
+            f"?token={asr_audio_access_token(video_id, get_settings())}",
         )
 
     def _check_status(self, response: httpx.Response) -> str:

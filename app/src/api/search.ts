@@ -49,7 +49,6 @@ export async function searchPersistedVideos(
     body: JSON.stringify({
       query,
       mode: mode === 'filename' ? 'filename' : 'hybrid',
-      ownerId: 'demo-local',
       limit: 10,
     }),
   })

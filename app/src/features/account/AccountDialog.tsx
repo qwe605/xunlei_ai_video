@@ -1,19 +1,7 @@
-import {
-  AlertCircle,
-  LogIn,
-  LogOut,
-  ShieldCheck,
-  UserPlus,
-  X,
-} from 'lucide-react'
+import { AlertCircle, LogIn, LogOut, ShieldCheck, UserPlus, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { demoSessionStorageKey, type DemoSession } from './accountSession'
-import { derivePasswordHash } from './passwordHash'
-
-interface StoredAccount extends DemoSession {
-  salt: string
-  passwordHash: string
-}
+import { loginAccount, logoutAccount, registerAccount } from '../../api/auth'
+import type { DemoSession } from './accountSession'
 
 interface AccountDialogProps {
   session: DemoSession | null
@@ -21,19 +9,6 @@ interface AccountDialogProps {
   onClose?: () => void
   variant?: 'modal' | 'page'
 }
-
-const ACCOUNT_KEY = 'xunlei-ai-demo-account'
-
-const bytesToBase64 = (bytes: Uint8Array) => {
-  let binary = ''
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte)
-  })
-  return btoa(binary)
-}
-
-const base64ToBytes = (value: string) =>
-  Uint8Array.from(atob(value), (character) => character.charCodeAt(0))
 
 export function AccountDialog({
   session,
@@ -67,19 +42,14 @@ export function AccountDialog({
 
     setSubmitting(true)
     try {
-      const salt = crypto.getRandomValues(new Uint8Array(16))
-      const account: StoredAccount = {
-        displayName: displayName.trim(),
-        email: email.trim().toLowerCase(),
-        salt: bytesToBase64(salt),
-        passwordHash: await derivePasswordHash(password, salt),
-      }
-      const nextSession = { displayName: account.displayName, email: account.email }
-      localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account))
-      localStorage.setItem(demoSessionStorageKey, JSON.stringify(nextSession))
+      const nextSession = await registerAccount(
+        displayName.trim(),
+        email.trim().toLowerCase(),
+        password,
+      )
       onSessionChange(nextSession)
-    } catch {
-      setError('注册失败，请稍后重试')
+    } catch (registerError) {
+      setError(registerError instanceof Error ? registerError.message : '注册失败，请稍后重试')
     } finally {
       setSubmitting(false)
     }
@@ -90,33 +60,28 @@ export function AccountDialog({
     setError('')
     setSubmitting(true)
     try {
-      const value = localStorage.getItem(ACCOUNT_KEY)
-      if (!value) {
-        setError('本机还没有 Demo 账号，请先注册')
-        return
-      }
-      const account = JSON.parse(value) as StoredAccount
-      const passwordHash = await derivePasswordHash(password, base64ToBytes(account.salt))
-      if (account.email !== email.trim().toLowerCase() || account.passwordHash !== passwordHash) {
-        setError('邮箱或密码不正确')
-        return
-      }
-      const nextSession = { displayName: account.displayName, email: account.email }
-      localStorage.setItem(demoSessionStorageKey, JSON.stringify(nextSession))
+      const nextSession = await loginAccount(email.trim().toLowerCase(), password)
       onSessionChange(nextSession)
-    } catch {
-      setError('登录失败，本地账号数据可能已损坏，请重新注册')
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : '登录失败，请稍后重试')
     } finally {
       setSubmitting(false)
     }
   }
 
-  const logout = () => {
-    localStorage.removeItem(demoSessionStorageKey)
-    setMode('login')
-    setPassword('')
+  const logout = async () => {
+    setSubmitting(true)
     setError('')
-    onSessionChange(null)
+    try {
+      await logoutAccount()
+      setMode('login')
+      setPassword('')
+      onSessionChange(null)
+    } catch (logoutError) {
+      setError(logoutError instanceof Error ? logoutError.message : '退出登录失败')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -135,7 +100,7 @@ export function AccountDialog({
         <header className="import-dialog-header">
           <div>
             <h2 id="account-title">{session ? '我的片库账号' : '登录迅雷 AI 片库'}</h2>
-            <p>{session ? '管理当前浏览器中的本地会话' : '建立仅用于体验 Demo 的本地账号'}</p>
+            <p>{session ? '管理当前登录账号' : '登录后进入自己的视频片库'}</p>
           </div>
           {onClose && (
             <button type="button" className="icon-button" onClick={onClose} aria-label="关闭账号窗口">
@@ -153,17 +118,23 @@ export function AccountDialog({
                 <span>{session.email}</span>
                 <small>
                   <ShieldCheck size={14} />
-                  Demo 本地账号
+                  服务端安全会话
                 </small>
               </div>
-              <button type="button" className="button button-secondary" onClick={logout}>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => void logout()}
+                disabled={submitting}
+              >
                 <LogOut size={15} />
                 退出
               </button>
             </section>
             <p className="local-auth-note account-profile-note">
-              此账号不会连接迅雷账号或读取云盘。正式产品应由迅雷内部账号体系直接提供当前用户身份与文件权限。
+              本地导入视频、AI 结果和观看进度仅对当前账号可见。
             </p>
+            {error && <p className="import-error" role="alert">{error}</p>}
           </div>
         ) : (
           <>

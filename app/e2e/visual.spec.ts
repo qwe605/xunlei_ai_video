@@ -5,10 +5,11 @@ import { expect, test } from '@playwright/test'
 const outputDir = resolve('..', 'output', 'qa')
 
 async function openLibraryAsLoggedInUser(page: import('@playwright/test').Page, suffix = 'capture') {
+  const uniqueSuffix = `${suffix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
   await page.goto('/')
   await page.getByRole('tab', { name: '注册' }).click()
   await page.getByLabel('昵称').fill(`评审账号${suffix}`)
-  await page.getByLabel('邮箱').fill(`judge-${suffix}@example.com`)
+  await page.getByLabel('邮箱').fill(`judge-${uniqueSuffix}@example.com`)
   await page.getByLabel('密码').fill('review-pass-2026')
   await page.getByRole('button', { name: '创建并登录' }).click()
   await expect(page.getByRole('heading', { name: '全部视频' })).toBeVisible()

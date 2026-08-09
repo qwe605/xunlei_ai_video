@@ -11,6 +11,7 @@ class AnalysisJobRecord(TimestampMixin, Base):
     __tablename__ = "analysis_jobs"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(120), index=True, nullable=False)
     video_id: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
     status: Mapped[str] = mapped_column(String(20), index=True, nullable=False)
     stage: Mapped[str] = mapped_column(String(80), nullable=False)

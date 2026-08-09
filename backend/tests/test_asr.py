@@ -55,10 +55,12 @@ class ChineseAsrTests(unittest.TestCase):
 
             self.assertEqual(audio_path.read_bytes(), b"wave")
             self.assertFalse(extracted_audio.exists())
-            self.assertEqual(
-                audio_url,
-                "https://example.com/api/v1/analyses/media/video-api/asr-audio",
+            self.assertTrue(
+                audio_url.startswith(
+                    "https://example.com/api/v1/analyses/media/video-api/asr-audio?token="
+                )
             )
+            self.assertEqual(len(audio_url.rsplit("=", 1)[-1]), 64)
 
     def test_parses_funasr_sentence_timestamps(self) -> None:
         segments = parse_funasr_result(

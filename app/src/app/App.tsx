@@ -4,7 +4,8 @@ import { AppSidebar } from '../components/AppSidebar'
 import { demoLibrary } from '../data/demoLibrary'
 import { videoSchema, type Video } from '../data/schema'
 import { AccountDialog } from '../features/account/AccountDialog'
-import { readDemoSession, type DemoSession } from '../features/account/accountSession'
+import type { DemoSession } from '../features/account/accountSession'
+import { readCurrentUser } from '../api/auth'
 import {
   createBlockedJob,
   createQueuedJob,
@@ -34,7 +35,8 @@ export function App() {
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>('all')
   const [importOpen, setImportOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
-  const [session, setSession] = useState<DemoSession | null>(() => readDemoSession())
+  const [session, setSession] = useState<DemoSession | null>(null)
+  const [sessionLoading, setSessionLoading] = useState(true)
   const [analysisJobs, setAnalysisJobs] = useState<AnalysisJob[]>(() =>
     demoLibrary
       .filter((video) => video.indexStatus !== 'ready')
@@ -50,6 +52,17 @@ export function App() {
   const selectedVideo =
     'videoId' in route ? videos.find((video) => video.id === route.videoId) : undefined
   const handleSessionChange = (nextSession: DemoSession | null) => {
+    localObjectUrls.current.forEach((url) => URL.revokeObjectURL(url))
+    localObjectUrls.current = []
+    localFiles.current.clear()
+    localPosters.current.clear()
+    localAnalysisModes.current.clear()
+    setVideos(demoLibrary)
+    setAnalysisJobs(
+      demoLibrary
+        .filter((video) => video.indexStatus !== 'ready')
+        .map((video) => createBlockedJob(video)),
+    )
     setSession(nextSession)
     if (nextSession && route.name !== 'library') {
       navigateTo(routes.library(), { replace: true })
@@ -60,6 +73,23 @@ export function App() {
       navigateTo(routes.library(), { replace: true })
     }
   }
+
+  useEffect(() => {
+    let active = true
+    void readCurrentUser()
+      .then((current) => {
+        if (active) setSession(current)
+      })
+      .catch(() => {
+        if (active) setSession(null)
+      })
+      .finally(() => {
+        if (active) setSessionLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     // 深链接里的视频 ID 可能已失效，回到片库而不是留下空白主内容。
@@ -301,6 +331,10 @@ export function App() {
     )
   }
 
+  if (sessionLoading) {
+    return <main className="auth-page" aria-busy="true" aria-label="正在确认登录状态" />
+  }
+
   if (!session) {
     return (
       <main className="auth-page" id="main-content" tabIndex={-1}>
@@ -310,7 +344,7 @@ export function App() {
           </div>
           <div>
             <h1 id="auth-page-title">迅雷 AI 片库</h1>
-            <p>请先登录或注册本地体验账号，再进入片库、导入视频和播放页面。</p>
+            <p>请先登录或注册账号，再进入自己的片库、导入视频和播放页面。</p>
           </div>
         </section>
         <AccountDialog

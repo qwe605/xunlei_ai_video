@@ -7,6 +7,7 @@ from app.config import get_settings
 from app.controllers import api_router
 from app.database.session import init_database
 from app.services.analysis_jobs import AnalysisService
+from app.services.auth import AuthService
 from app.services.feedback import FeedbackService
 from app.services.library import LibraryService
 from app.services.questions import QuestionService
@@ -19,6 +20,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     init_database()
     service = AnalysisService()
     application.state.analysis_service = service
+    application.state.auth_service = AuthService()
     application.state.library_service = LibraryService()
     application.state.search_service = SearchService()
     application.state.question_service = QuestionService()

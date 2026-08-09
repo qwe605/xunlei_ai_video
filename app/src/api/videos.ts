@@ -129,7 +129,6 @@ export async function saveWatchProgress(video: Video, positionSeconds: number): 
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      userId: 'demo-local',
       positionSeconds: Math.min(positionSeconds, video.durationSeconds),
       durationSeconds: video.durationSeconds,
     }),

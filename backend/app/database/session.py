@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
 from app.database.base import Base
+from app.database.migrations import migrate_existing_database
 
 
 settings = get_settings()
@@ -31,6 +32,7 @@ def init_database() -> None:
     import app.database.models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    migrate_existing_database(engine)
 
 
 def get_db() -> Generator[Session, None, None]:

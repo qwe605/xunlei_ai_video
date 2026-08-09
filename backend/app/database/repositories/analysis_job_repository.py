@@ -13,9 +13,10 @@ class AnalysisJobRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def create(self, job: AnalysisJob) -> AnalysisJob:
+    def create(self, job: AnalysisJob, owner_id: str = "demo-local") -> AnalysisJob:
         record = AnalysisJobRecord(
             id=job.id,
+            owner_id=owner_id,
             video_id=job.video_id,
             status=job.status.value,
             stage=job.stage,
@@ -28,8 +29,11 @@ class AnalysisJobRepository:
         self._session.flush()
         return self._to_schema(record)
 
-    def get(self, job_id: str) -> AnalysisJob | None:
-        record = self._session.get(AnalysisJobRecord, job_id)
+    def get(self, job_id: str, owner_id: str | None = None) -> AnalysisJob | None:
+        statement = select(AnalysisJobRecord).where(AnalysisJobRecord.id == job_id)
+        if owner_id is not None:
+            statement = statement.where(AnalysisJobRecord.owner_id == owner_id)
+        record = self._session.scalar(statement)
         return self._to_schema(record) if record else None
 
     def update(self, job_id: str, values: dict[str, Any]) -> AnalysisJob:

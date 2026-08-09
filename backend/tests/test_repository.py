@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -75,6 +76,23 @@ class AnalysisJobRepositoryTests(unittest.TestCase):
             recovered = repository.get("job-interrupted")
             self.assertEqual(recovered.status, JobStatus.failed)  # type: ignore[union-attr]
             self.assertEqual(recovered.error_code, "SERVICE_RESTARTED")  # type: ignore[union-attr]
+
+    def test_analysis_jobs_are_readable_by_owner_only(self) -> None:
+        with self.session_factory.begin() as session:
+            repository = AnalysisJobRepository(session)
+            repository.create(
+                AnalysisJob(
+                    id="job-private",
+                    video_id="video-private",
+                    status=JobStatus.queued,
+                    stage="等待整理",
+                    progress=3,
+                    detail="等待执行",
+                ),
+                owner_id="owner-a",
+            )
+            self.assertIsNotNone(repository.get("job-private", "owner-a"))
+            self.assertIsNone(repository.get("job-private", "owner-b"))
 
     def test_video_repository_persists_analysis_result_and_progress(self) -> None:
         with self.session_factory.begin() as session:
@@ -267,7 +285,7 @@ class SearchServiceTests(unittest.TestCase):
         self.engine = create_engine("sqlite+pysqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
-        self.patch_scope = unittest.mock.patch("app.services.search.session_scope", self._session_scope)
+        self.patch_scope = mock.patch("app.services.search.session_scope", self._session_scope)
         self.patch_scope.start()
 
     def tearDown(self) -> None:
@@ -317,7 +335,7 @@ class SearchServiceTests(unittest.TestCase):
             )
 
         response = SearchService().search(
-            SearchRequest(query="找讲 Python 保留字的视频", mode="hybrid")
+            SearchRequest(query="找关于 Python 保留字的视频", mode="hybrid")
         )
 
         self.assertEqual(response.total, 1)
@@ -331,8 +349,8 @@ class QuestionServiceTests(unittest.TestCase):
         self.engine = create_engine("sqlite+pysqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
-        self.patch_scope = unittest.mock.patch("app.services.questions.session_scope", self._session_scope)
-        self.patch_answer = unittest.mock.patch(
+        self.patch_scope = mock.patch("app.services.questions.session_scope", self._session_scope)
+        self.patch_answer = mock.patch(
             "app.services.questions.request_video_answer",
             side_effect=MinimaxSummaryError("测试环境不调用模型"),
         )

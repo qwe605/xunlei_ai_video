@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.controllers import api_router
+from app.dependencies import get_current_user
 from app.schemas import (
     AnalysisJob,
     JobStatus,
@@ -25,6 +26,7 @@ from app.schemas import (
     VideoListItem,
     VideoQuestionRequest,
     VideoQuestionResponse,
+    UserRead,
 )
 
 
@@ -43,7 +45,7 @@ class FakeAnalysisService:
             detail="已进入队列",
         )
 
-    def get(self, job_id: str) -> AnalysisJob | None:
+    def get(self, job_id: str, owner_id: str | None = None) -> AnalysisJob | None:
         if job_id != "job-api":
             return None
         return AnalysisJob(
@@ -169,7 +171,7 @@ class FakeSearchService:
     def __init__(self) -> None:
         self.payload: SearchRequest | None = None
 
-    def search(self, payload: SearchRequest) -> SearchResponse:
+    def search(self, payload: SearchRequest, owner_id: str = "demo-local") -> SearchResponse:
         self.payload = payload
         return SearchResponse(
             query=payload.query,
@@ -196,6 +198,7 @@ class FakeQuestionService:
         *,
         video_id: str,
         payload: VideoQuestionRequest,
+        owner_id: str = "demo-local",
     ) -> VideoQuestionResponse:
         if video_id != "video-api":
             raise LookupError("视频不存在或无权访问")
@@ -243,6 +246,11 @@ class ControllerTests(unittest.TestCase):
         application.state.search_service = self.search_service
         application.state.question_service = self.question_service
         application.state.feedback_service = self.feedback_service
+        application.dependency_overrides[get_current_user] = lambda: UserRead(
+            id="demo-local",
+            email="tester@example.com",
+            display_name="测试用户",
+        )
         self.client = TestClient(application)
 
     def tearDown(self) -> None:

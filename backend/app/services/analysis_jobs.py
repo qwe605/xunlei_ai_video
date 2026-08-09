@@ -136,6 +136,11 @@ class AnalysisService:
         if not suffix:
             raise UploadValidationError(415, "仅支持 MP4 或 WebM 视频")
 
+        with session_scope() as session:
+            existing_owner = VideoRepository(session).get_owner_id(video_id)
+        if existing_owner is not None and existing_owner != owner_id:
+            raise UploadValidationError(409, "视频标识已被占用，请重新选择文件后再试")
+
         media_dir = self._settings.media_root / video_id
         media_dir.mkdir(parents=True, exist_ok=True)
         path = media_dir / f"source{suffix}"
@@ -206,7 +211,7 @@ class AnalysisService:
                 poster_mime_type=poster_mime_type,
                 poster_size_bytes=poster_total,
             )
-        return self.create(video_id, path, duration_seconds, analysis_mode)
+        return self.create(video_id, path, duration_seconds, analysis_mode, owner_id)
 
     def create(
         self,
@@ -214,6 +219,7 @@ class AnalysisService:
         source_path: Path,
         duration_seconds: float,
         analysis_mode: str = "fast",
+        owner_id: str = "demo-local",
     ) -> AnalysisJob:
         if analysis_mode not in {"fast", "api", "precise"}:
             raise UploadValidationError(422, "不支持的分析模式")
@@ -234,15 +240,15 @@ class AnalysisService:
             ),
         )
         with session_scope() as session:
-            created = AnalysisJobRepository(session).create(job)
+            created = AnalysisJobRepository(session).create(job, owner_id)
         self._executor.submit(
-            self._run, created.id, source_path, duration_seconds, analysis_mode
+            self._run, created.id, source_path, duration_seconds, analysis_mode, owner_id
         )
         return created
 
-    def get(self, job_id: str) -> AnalysisJob | None:
+    def get(self, job_id: str, owner_id: str | None = None) -> AnalysisJob | None:
         with session_scope() as session:
-            return AnalysisJobRepository(session).get(job_id)
+            return AnalysisJobRepository(session).get(job_id, owner_id)
 
     def shutdown(self) -> None:
         self._executor.shutdown(wait=False, cancel_futures=False)
@@ -268,6 +274,7 @@ class AnalysisService:
         source_path: Path,
         duration_seconds: float,
         analysis_mode: str,
+        owner_id: str = "demo-local",
     ) -> None:
         try:
             self._update(
@@ -419,7 +426,7 @@ class AnalysisService:
                 with session_scope() as session:
                     VideoRepository(session).apply_analysis_result(
                         video_id=current.video_id,
-                        owner_id="demo-local",
+                        owner_id=owner_id,
                         result=result,
                     )
             except OperationalError:

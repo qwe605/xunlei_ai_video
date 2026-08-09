@@ -37,7 +37,6 @@ export async function askPersistedVideo(videoId: string, question: string): Prom
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       question,
-      ownerId: 'demo-local',
       limit: 5,
     }),
   })

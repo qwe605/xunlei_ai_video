@@ -93,6 +93,13 @@ class VideoRepository:
         )
         return [self._to_list_item(record, owner_id) for record in self._session.scalars(statement)]
 
+    def get_owner_id(self, video_id: str) -> str | None:
+        """上传落盘前检查全局视频 ID，防止其他账号覆盖同路径媒体。"""
+
+        return self._session.scalar(
+            select(VideoRecord.owner_id).where(VideoRecord.id == video_id)
+        )
+
     def get_detail(self, video_id: str, owner_id: str = "demo-local") -> VideoDetail | None:
         record = self._load_video(video_id, owner_id)
         return self._to_detail(record, owner_id) if record else None
