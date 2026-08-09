@@ -169,6 +169,50 @@ class AnalysisServiceSchedulingTests(unittest.TestCase):
 
         video.read.assert_not_called()
 
+    def test_cloud_api_engine_rejects_fast_mode_before_upload_read(self) -> None:
+        """纯 API 云端不能因为误选快速模式而读取大视频或加载本地模型。"""
+        service = AnalysisService.__new__(AnalysisService)
+        service._settings = MagicMock()
+        video = MagicMock()
+
+        with (
+            patch("app.services.analysis_jobs.ASR_ENGINE", "api"),
+            self.assertRaisesRegex(UploadValidationError, "云端演示不支持本地 FunASR"),
+        ):
+            asyncio.run(
+                service.create_from_upload(
+                    video=video,
+                    video_id="video-test",
+                    duration_seconds=10,
+                    analysis_mode="fast",
+                )
+            )
+
+        video.read.assert_not_called()
+
+    def test_unconfigured_api_mode_is_rejected_before_upload_read(self) -> None:
+        """ASR API 未配置时不应先接收完整视频再失败。"""
+        service = AnalysisService.__new__(AnalysisService)
+        service._settings = MagicMock(
+            public_base_url="",
+            volc_asr_api_key="",
+            volc_asr_app_id="",
+            volc_asr_access_token="",
+        )
+        video = MagicMock()
+
+        with self.assertRaisesRegex(UploadValidationError, "ASR API 尚未配置"):
+            asyncio.run(
+                service.create_from_upload(
+                    video=video,
+                    video_id="video-test",
+                    duration_seconds=10,
+                    analysis_mode="api",
+                )
+            )
+
+        video.read.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

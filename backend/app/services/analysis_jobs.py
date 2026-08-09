@@ -18,6 +18,7 @@ from app.integrations.asr import (
     ASR_MODEL,
     PRECISE_ASR_MODEL,
     VolcAsrError,
+    api_asr_ready,
     create_transcriber,
     effective_content_duration,
     precise_model_ready,
@@ -112,10 +113,24 @@ class AnalysisService:
         width: int | None = None,
         height: int | None = None,
     ) -> AnalysisJob:
+        if analysis_mode == "fast" and ASR_ENGINE == "api":
+            raise UploadValidationError(
+                503,
+                "云端演示不支持本地 FunASR 快速模型，请使用 ASR API；本地安装包可体验快速识别。",
+            )
+        if analysis_mode == "api" and not api_asr_ready(self._settings):
+            raise UploadValidationError(
+                503,
+                "ASR API 尚未配置，请联系管理员完成火山引擎鉴权后再试。",
+            )
         if analysis_mode == "precise" and not precise_model_ready():
             raise UploadValidationError(
                 503,
-                "精准语音模型尚未安装完成，请暂时使用快速模式。",
+                (
+                    "云端演示不支持本地 Whisper large-v3 精准模型；本地安装包可体验精准识别。"
+                    if ASR_ENGINE == "api"
+                    else "精准语音模型尚未安装完成，请暂时使用快速模式。"
+                ),
             )
         suffix = ALLOWED_MEDIA.get(video.content_type or "")
         if not suffix:

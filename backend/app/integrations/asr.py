@@ -12,7 +12,7 @@ from urllib.parse import quote, urlparse
 import httpx
 import numpy as np
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.services.content_analysis import TranscriptSegment, TranscriptWord
 from app.services.text_normalization import to_simplified_chinese
 
@@ -56,9 +56,26 @@ PRECISE_MODEL_REQUIRED_FILES = (
 
 def precise_model_ready() -> bool:
     """只有本地权重完整时才开放精准模式，用户任务不负责临时下载模型。"""
+    if ASR_ENGINE == "api":
+        return False
     if not all((PRECISE_MODEL_PATH / name).is_file() for name in PRECISE_MODEL_REQUIRED_FILES):
         return False
     return (PRECISE_MODEL_PATH / "model.bin").stat().st_size >= PRECISE_MODEL_MIN_BYTES
+
+
+def local_fast_available() -> bool:
+    """云端 API 专用镜像不包含本地 ASR 依赖，不能开放快速模式。"""
+    return ASR_ENGINE in {"funasr", "faster-whisper"}
+
+
+def api_asr_ready(settings: Settings | None = None) -> bool:
+    """检查录音文件识别 API 所需的公网回调地址和鉴权参数。"""
+    current = settings or get_settings()
+    credentials_ready = bool(
+        current.volc_asr_api_key
+        or (current.volc_asr_app_id and current.volc_asr_access_token)
+    )
+    return bool(current.public_base_url and credentials_ready)
 
 
 @dataclass(frozen=True)

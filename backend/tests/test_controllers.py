@@ -239,6 +239,7 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(health.status_code, 200)
         self.assertEqual(health.json()["version"], "2.0.0")
         self.assertIn("preciseModelReady", health.json())
+        self.assertIn("localFastAvailable", health.json())
 
         missing = self.client.get("/api/v1/analyses/missing")
         self.assertEqual(missing.status_code, 404)

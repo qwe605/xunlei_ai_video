@@ -112,6 +112,7 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
   const [media, setMedia] = useState<LocalMedia | null>(null)
   const [loading, setLoading] = useState(false)
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('fast')
+  const [localFastAvailable, setLocalFastAvailable] = useState<boolean | null>(null)
   const [preciseModelReady, setPreciseModelReady] = useState<boolean | null>(null)
   const [apiAsrReady, setApiAsrReady] = useState(false)
   const [preciseNotice, setPreciseNotice] = useState('')
@@ -130,7 +131,9 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
       .then((capabilities) => {
         if (active) {
           setPreciseModelReady(capabilities.preciseModelReady)
+          setLocalFastAvailable(capabilities.localFastAvailable)
           setApiAsrReady(capabilities.apiAsrReady)
+          if (!capabilities.localFastAvailable) setAnalysisMode('api')
         }
       })
       .catch(() => {
@@ -175,8 +178,16 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
 
   const confirmLocalImport = () => {
     if (!media) return
+    if (analysisMode === 'fast' && localFastAvailable === false) {
+      setPreciseNotice('云端演示不加载本地 FunASR 快速模型，请使用 ASR API 识别；快速识别保留在本地安装包中。')
+      return
+    }
+    if (analysisMode === 'api' && !apiAsrReady) {
+      setPreciseNotice('ASR API 尚未配置，暂时无法提交识别任务。')
+      return
+    }
     if (analysisMode === 'precise' && preciseModelReady !== true) {
-      setPreciseNotice('当前腾讯云演示服务器配置较小，暂不支持本地 Whisper large-v3 精准识别。可体验快速识别或 ASR API 识别；如需本地精准识别，请使用安装包版本。')
+      setPreciseNotice('云端演示不加载本地 Whisper large-v3 精准模型，请使用 ASR API 识别；精准识别保留在本地安装包中。')
       return
     }
     const title = media.file.name.replace(/\.[^.]+$/, '') || media.file.name
@@ -335,6 +346,10 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
                   aria-checked={analysisMode === 'fast'}
                   className={analysisMode === 'fast' ? 'active' : ''}
                   onClick={() => {
+                    if (localFastAvailable === false) {
+                      setPreciseNotice('云端演示不加载本地 FunASR 快速模型，请使用 ASR API 识别；快速识别保留在本地安装包中。')
+                      return
+                    }
                     setPreciseNotice('')
                     setAnalysisMode('fast')
                   }}
@@ -362,7 +377,7 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
                   className={analysisMode === 'precise' ? 'active' : ''}
                   onClick={() => {
                     if (preciseModelReady !== true) {
-                      setPreciseNotice('当前腾讯云演示服务器配置较小，暂不支持本地 Whisper large-v3 精准识别。可体验快速识别或 ASR API 识别；如需本地精准识别，请使用安装包版本。')
+                      setPreciseNotice('云端演示不加载本地 Whisper large-v3 精准模型，请使用 ASR API 识别；精准识别保留在本地安装包中。')
                       return
                     }
                     setPreciseNotice('')
@@ -375,8 +390,8 @@ export function ImportVideoDialog({ onClose, onImport }: ImportVideoDialogProps)
               </div>
               <p hidden={analysisMode === 'api'}>
                 {analysisMode === 'fast'
-                  ? preciseModelReady === false
-                    ? '精准模型尚未安装完成，当前仅开放快速模式。'
+                  ? localFastAvailable === false
+                    ? '快速识别仅在本地安装包中提供。'
                     : '适合日常整理，优先缩短等待时间。'
                   : '适合口音、专名或嘈杂音轨；CPU 环境处理 9 分钟视频约需 17 分钟。'}
               </p>

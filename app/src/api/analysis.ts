@@ -40,6 +40,7 @@ export type AnalysisMode = 'fast' | 'api' | 'precise'
 const analysisCapabilitiesSchema = z.object({
   preciseModel: z.string().min(1),
   preciseModelReady: z.boolean(),
+  localFastAvailable: z.boolean().optional().default(true),
   apiAsrReady: z.boolean().optional().default(false),
 })
 

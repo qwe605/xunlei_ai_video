@@ -442,7 +442,7 @@ test('本地导入视频可以从详情页删除并同步移出片库', async ({
   expect(deleted).toBe(true)
 })
 
-test('精准模型未安装时不允许提交精准任务', async ({ page }) => {
+test('云端仅开放 ASR API，本地快速与精准模式给出安装包提示', async ({ page }) => {
   await page.route('**/api/v1/health', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -453,6 +453,7 @@ test('精准模型未安装时不允许提交精准任务', async ({ page }) => 
         version: '2.0.0',
         preciseModel: 'faster-whisper:large-v3',
         preciseModelReady: false,
+        localFastAvailable: false,
         apiAsrReady: true,
       }),
     })
@@ -461,10 +462,13 @@ test('精准模型未安装时不允许提交精准任务', async ({ page }) => 
   await openLibraryAsLoggedInUser(page, '/', 'precise-disabled')
   await page.getByRole('button', { name: '导入视频' }).click()
 
-  await expect(page.getByRole('radio', { name: /精准/ })).toBeEnabled()
+  await expect(page.getByRole('radio', { name: /ASR API/ })).toHaveAttribute('aria-checked', 'true')
+  await page.getByRole('radio', { name: /快速/ }).click()
+  await expect(page.getByText(/快速识别保留在本地安装包/)).toBeVisible()
+  await expect(page.getByRole('radio', { name: /ASR API/ })).toHaveAttribute('aria-checked', 'true')
   await page.getByRole('radio', { name: /精准/ }).click()
-  await expect(page.getByText(/当前腾讯云演示服务器配置较小/)).toBeVisible()
-  await page.getByRole('radio', { name: /ASR API/ }).click()
+  await expect(page.getByText(/精准识别保留在本地安装包/)).toBeVisible()
+  await expect(page.getByRole('radio', { name: /ASR API/ })).toHaveAttribute('aria-checked', 'true')
   await expect(page.getByText(/按音频时长调用火山引擎 ASR API/)).toBeVisible()
 })
 

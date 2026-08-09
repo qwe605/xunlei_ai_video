@@ -67,6 +67,7 @@ class HealthResponse(ApiModel):
     version: str
     precise_model: str
     precise_model_ready: bool
+    local_fast_available: bool
     api_asr_ready: bool = False
 
 
